@@ -1,37 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# LISAN INTELLIGENCE
 
-## Getting Started
+> A quantitative crypto signal platform with a 14-indicator scoring engine.  
+> Replace gut feelings with math. Free. No paywall. Just signals.
 
-First, run the development server:
+**🔗 Live:** [lisanintel.com](https://lisanintel.com)
+
+---
+
+## What Is This?
+
+LISAN INTELLIGENCE is a research tool that analyzes cryptocurrency markets using 14 technical indicators across 4 categories (Momentum, Trend, Volume, Sentiment). It generates LONG/SHORT/HOLD signals with confidence scores and ATR-based risk levels.
+
+**It is NOT:**
+- A trading bot
+- Financial advice
+- A guarantee of profits
+
+---
+
+## Features
+
+- **14-Indicator Scoring Engine** — RSI, MACD, Ichimoku, Bollinger Bands, Fear & Greed Index, and more
+- **20 Curated Assets** — Major cryptos with sufficient liquidity for reliable TA
+- **ATR-Based Risk Levels** — Dynamic stop loss and take profit calculations (1:2 R:R)
+- **Self-Learning Weights** — System adapts indicator weights based on signal performance
+- **Real-Time Data** — Binance, Hyperliquid, Alternative.me APIs
+- **Watchlist** — Track assets and monitor price changes from when you added them
+
+---
+
+## Tech Stack
+
+- **Framework:** Next.js 14 (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS
+- **Data Sources:** Binance API, Hyperliquid API, Alternative.me
+- **Deployment:** Vercel
+
+---
+
+## Local Development
 
 ```bash
+# Clone the repo
+git clone https://github.com/LisanXG/lisan-intelligence.git
+cd lisan-intelligence
+
+# Install dependencies
+npm install
+
+# Run development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to see the app.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Documentation
 
-## Learn More
+Full technical whitepaper available at [lisanintel.com/docs](https://lisanintel.com/docs)
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Author
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Built by [Lisan](https://lisanholdings.dev) — Navy veteran, former defense contractor, now building tools in the open.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
- 
+MIT
