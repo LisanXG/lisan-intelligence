@@ -724,6 +724,70 @@ export default function DocsPage() {
                             </p>
                         </Accordion>
 
+                        <Accordion title="Platform Features — Beyond Signals">
+                            <p className="mb-6">
+                                Signals are just the start. LISAN INTELLIGENCE includes tools for transparency,
+                                sharing, and institutional-grade data analysis.
+                            </p>
+
+                            <div className="space-y-8">
+                                <div>
+                                    <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                        <span className="text-cyan-600">📊</span>
+                                        Transparency Dashboard (/proof)
+                                    </h4>
+                                    <p className="text-slate-600 mb-3">
+                                        Every signal we&apos;ve ever generated is tracked and verified. The <a href="/proof" className="text-cyan-600 hover:underline">/proof page</a> shows:
+                                    </p>
+                                    <ul className="list-disc list-inside space-y-1 text-slate-600 ml-4 mb-3">
+                                        <li><strong>Win rates by score bucket</strong> — Do higher scores actually perform better?</li>
+                                        <li><strong>Cumulative returns</strong> — How much R (risk units) has the system generated?</li>
+                                        <li><strong>Recent outcomes</strong> — The last 15 completed signals with full entry/exit details</li>
+                                        <li><strong>Known failure modes</strong> — Where the system historically underperforms</li>
+                                    </ul>
+                                    <p className="text-slate-500 text-sm">
+                                        No cherry-picking. No hiding losses. If the system is bad, you&apos;ll see it here.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                        <span className="text-cyan-600">📤</span>
+                                        Shareable Signal Cards
+                                    </h4>
+                                    <p className="text-slate-600 mb-3">
+                                        Every signal card has a share button. Click it to:
+                                    </p>
+                                    <ul className="list-disc list-inside space-y-1 text-slate-600 ml-4 mb-3">
+                                        <li>Generate a <strong>PNG image</strong> of the signal (branded, dark theme)</li>
+                                        <li>Auto-download the image to your device</li>
+                                        <li>Open a <strong>pre-filled X/Twitter post</strong> with the signal details</li>
+                                    </ul>
+                                    <p className="text-slate-500 text-sm">
+                                        Build your track record publicly. Attach the image to show exactly what the signal looked like.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                        <span className="text-cyan-600">📋</span>
+                                        Quant View (Institutional Mode)
+                                    </h4>
+                                    <p className="text-slate-600 mb-3">
+                                        Toggle from card view to a dense data table with:
+                                    </p>
+                                    <ul className="list-disc list-inside space-y-1 text-slate-600 ml-4 mb-3">
+                                        <li><strong>All signals in one table</strong> — Sortable by any column</li>
+                                        <li><strong>CSV export</strong> — Download all signal data for your own analysis</li>
+                                        <li><strong>Raw indicator values</strong> — See the actual numbers, not just scores</li>
+                                    </ul>
+                                    <p className="text-slate-500 text-sm">
+                                        For quants, researchers, and anyone who wants to build on top of the data.
+                                    </p>
+                                </div>
+                            </div>
+                        </Accordion>
+
                     </div>
 
                     {/* Disclaimer */}
@@ -754,7 +818,7 @@ export default function DocsPage() {
 
                     {/* Version */}
                     <div className="mt-8 text-center text-slate-400">
-                        <p>Version 1.2.0 — January 2026 — LISAN HOLDINGS</p>
+                        <p>Version 2.0.0 — January 2026 — LISAN HOLDINGS</p>
                     </div>
                 </div>
             </main>
