@@ -58,10 +58,33 @@ export interface TrackingStats {
 class SignalHistory {
     private signals: SignalRecord[] = [];
     private readonly storageKey = 'lisan_signal_history';
+    private readonly versionKey = 'lisan_tracking_version';
+    private readonly currentVersion = 2; // v2 = WebSocket-based tracking
     private readonly maxHistory = 1000; // Keep last 1000 signals
 
     constructor() {
+        this.checkVersion();
         this.loadFromStorage();
+    }
+
+    /**
+     * Check tracking system version and clear old data if needed
+     */
+    private checkVersion(): void {
+        if (typeof window === 'undefined') return;
+
+        try {
+            const storedVersion = localStorage.getItem(this.versionKey);
+            const version = storedVersion ? parseInt(storedVersion, 10) : 1;
+
+            if (version < this.currentVersion) {
+                console.log('[Tracking] Upgrading from v' + version + ' to v' + this.currentVersion + ' - clearing old data');
+                localStorage.removeItem(this.storageKey);
+                localStorage.setItem(this.versionKey, this.currentVersion.toString());
+            }
+        } catch (e) {
+            console.error('Failed to check tracking version:', e);
+        }
     }
 
     /**
