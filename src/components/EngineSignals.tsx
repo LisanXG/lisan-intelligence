@@ -66,9 +66,20 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
 
         fetchSignals();
 
+        // Initialize WebSocket for real-time tracking
+        import('@/lib/engine/websocket').then(({ initializeWebSocket }) => {
+            initializeWebSocket();
+        });
+
         // Refresh every 5 minutes
         const interval = setInterval(fetchSignals, 5 * 60 * 1000);
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            // Disconnect WebSocket on unmount
+            import('@/lib/engine/websocket').then(({ getHyperliquidWebSocket }) => {
+                getHyperliquidWebSocket().disconnect();
+            });
+        };
     }, []);
 
     // Track signals to the learning system
@@ -94,15 +105,30 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
                 }
 
                 // SECOND: Track new LONG/SHORT signals
-                const existingIds = new Set(history.getAll().map(s => s.signal.coin + '_' + s.signal.direction));
+                // Improved deduplication: use signal ID based on coin + timestamp window
+                const now = Date.now();
+                const oneHourAgo = now - (60 * 60 * 1000);
+
+                // Only consider recent open signals for deduplication
+                const recentOpenSignals = history.getAll().filter(s =>
+                    s.outcome === 'OPEN' &&
+                    new Date(s.signal.timestamp).getTime() > oneHourAgo
+                );
+                const existingCoins = new Set(recentOpenSignals.map(s => s.signal.coin));
+
                 const actionableSignals = newSignals.filter(s =>
                     s.direction !== 'HOLD' &&
-                    !existingIds.has(s.coin + '_' + s.direction)
+                    !existingCoins.has(s.coin)
                 );
 
                 for (const signal of actionableSignals) {
                     // Cast weights to Record<string, number> for addSignal
                     history.addSignal(signal, weights as unknown as Record<string, number>);
+
+                    // Subscribe to WebSocket for this coin
+                    import('@/lib/engine/websocket').then(({ getHyperliquidWebSocket }) => {
+                        getHyperliquidWebSocket().subscribe(signal.coin);
+                    });
                 }
             });
         });
