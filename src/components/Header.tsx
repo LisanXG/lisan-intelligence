@@ -12,6 +12,7 @@ export default function Header() {
         { href: '/', label: 'Dashboard' },
         { href: '/watchlist', label: 'Watchlist' },
         { href: '/signals', label: 'Signals' },
+        { href: '/proof', label: 'Proof' },
         { href: '/learning', label: 'Learning' },
         { href: '/docs', label: 'Docs' },
     ];

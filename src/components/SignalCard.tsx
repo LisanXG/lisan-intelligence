@@ -3,6 +3,8 @@
 import { SignalOutput } from '@/lib/engine';
 import { useState, useEffect } from 'react';
 import { isInWatchlist, toggleWatchlist } from '@/lib/watchlist';
+import { getScoreBucketWinRate } from '@/lib/engine/stats';
+import ShareButton from './ShareButton';
 
 interface SignalCardProps {
     signal: SignalOutput & { name?: string; image?: string };
@@ -21,11 +23,14 @@ export default function SignalCard({ signal, sparklineData, onWatchlistChange }:
 
     const [imgError, setImgError] = useState(false);
     const [isWatched, setIsWatched] = useState(false);
+    const [bucketContext, setBucketContext] = useState<{ winRate: number; sampleSize: number } | null>(null);
 
-    // Check watchlist status on mount
+    // Check watchlist status and get score bucket context on mount
     useEffect(() => {
         setIsWatched(isInWatchlist(coin));
-    }, [coin]);
+        const context = getScoreBucketWinRate(score);
+        setBucketContext(context);
+    }, [coin, score]);
 
     // Handle watchlist toggle
     const handleWatchlistClick = (e: React.MouseEvent) => {
@@ -125,6 +130,8 @@ export default function SignalCard({ signal, sparklineData, onWatchlistChange }:
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Share Button */}
+                    <ShareButton signal={signal} />
                     {/* Watchlist Star Button */}
                     <button
                         onClick={handleWatchlistClick}
@@ -174,6 +181,13 @@ export default function SignalCard({ signal, sparklineData, onWatchlistChange }:
                 <span>Vol: <strong className="text-[var(--text-primary)]">{Math.round(breakdown.volume.score)}</strong></span>
                 <span>Sent: <strong className="text-[var(--text-primary)]">{Math.round(breakdown.sentiment.score)}</strong></span>
             </div>
+
+            {/* Row 6: Score bucket context (only if enough historical data) */}
+            {bucketContext && bucketContext.sampleSize >= 10 && (
+                <div className="text-xs text-center pt-2 text-[var(--text-muted)]">
+                    Signals in this range: <span className={bucketContext.winRate >= 50 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{bucketContext.winRate.toFixed(0)}% win rate</span> ({bucketContext.sampleSize} signals)
+                </div>
+            )}
         </div>
     );
 }

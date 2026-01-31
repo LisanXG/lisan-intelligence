@@ -1,0 +1,35 @@
+# Changelog
+
+All notable changes to LISAN INTELLIGENCE will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.2.0] - 2026-01-31
+
+### Added
+- **Transparency Dashboard** (`/proof`) — Real performance data with win rates, cumulative returns, and score distribution
+- **Shareable Signal Cards** — Generate PNG images and share to X/Twitter with pre-filled signal details
+- **Quant View** — Dense data table with sorting and CSV export for institutional workflows
+- **Score Context** — Historical win rate displayed on signal cards (when sample size ≥ 10)
+- **Real-time WebSocket Tracking** — Zero-gap outcome monitoring via Hyperliquid WebSocket
+- **Mobile Responsive Styles** — Comprehensive breakpoints for 768px and 375px screens
+
+### Changed
+- Replaced PEPE with TIA (Celestia) in curated 20 assets — prevents sub-cent price tracking issues
+- Improved signal deduplication to check ALL recent signals (not just OPEN), preventing rapid re-addition
+
+### Fixed
+- Share button generating blank PNGs — now renders card on-screen during capture
+- Proof page header readability — wrapped in card container
+
+## [0.1.0] - 2026-01-28
+
+### Added
+- Initial release of LISAN INTELLIGENCE
+- 14-indicator scoring engine (RSI, MACD, Ichimoku, Bollinger, etc.)
+- 20 curated cryptocurrency assets
+- ATR-based risk levels with 1:2 R:R
+- Self-learning weight adaptation
+- Watchlist with price tracking
+- Real-time data from Binance, Hyperliquid, Alternative.me

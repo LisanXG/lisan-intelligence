@@ -24,7 +24,10 @@ LISAN INTELLIGENCE is a research tool that analyzes cryptocurrency markets using
 - **20 Curated Assets** — Major cryptos with sufficient liquidity for reliable TA
 - **ATR-Based Risk Levels** — Dynamic stop loss and take profit calculations (1:2 R:R)
 - **Self-Learning Weights** — System adapts indicator weights based on signal performance
-- **Real-Time Data** — Binance, Hyperliquid, Alternative.me APIs
+- **Real-Time Tracking** — WebSocket-based outcome monitoring via Hyperliquid
+- **Transparency Dashboard** — Full performance history at `/proof` with win rates and cumulative returns
+- **Shareable Signal Cards** — Generate PNGs and share to X/Twitter
+- **Quant View** — Dense data table with CSV export for institutional workflows
 - **Watchlist** — Track assets and monitor price changes from when you added them
 
 ---

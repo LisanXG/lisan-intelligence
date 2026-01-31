@@ -274,7 +274,7 @@ export default function DocsPage() {
                             </p>
 
                             <div className="grid grid-cols-4 md:grid-cols-5 gap-3 mb-6">
-                                {['BTC', 'ETH', 'SOL', 'BNB', 'AVAX', 'SUI', 'APT', 'HYPE', 'LINK', 'AAVE', 'UNI', 'XRP', 'ADA', 'DOT', 'ATOM', 'MATIC', 'ARB', 'OP', 'DOGE', 'PEPE'].map((coin) => (
+                                {['BTC', 'ETH', 'SOL', 'BNB', 'AVAX', 'SUI', 'APT', 'HYPE', 'LINK', 'AAVE', 'UNI', 'XRP', 'ADA', 'DOT', 'ATOM', 'MATIC', 'ARB', 'OP', 'DOGE', 'TIA'].map((coin) => (
                                     <div key={coin} className="py-3 px-4 bg-slate-100 rounded-lg text-center font-semibold text-slate-700">
                                         {coin}
                                     </div>

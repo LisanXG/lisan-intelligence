@@ -57,10 +57,31 @@ class WeightManager {
     private history: LearningCycle[] = [];
     private readonly storageKey = 'lisan_weights';
     private readonly historyKey = 'lisan_learning_history';
+    private readonly versionKey = 'lisan_learning_version';
+    private readonly currentVersion = 2; // v2 = Fixed PEPE deduplication bug
 
     constructor() {
         this.weights = { ...DEFAULT_WEIGHTS };
+        this.checkVersion();
         this.loadFromStorage();
+    }
+
+    private checkVersion(): void {
+        if (typeof window === 'undefined') return;
+
+        try {
+            const storedVersion = localStorage.getItem(this.versionKey);
+            const version = storedVersion ? parseInt(storedVersion, 10) : 1;
+
+            if (version < this.currentVersion) {
+                console.log('[Learning] Upgrading from v' + version + ' to v' + this.currentVersion + ' - resetting weights and history');
+                localStorage.removeItem(this.storageKey);
+                localStorage.removeItem(this.historyKey);
+                localStorage.setItem(this.versionKey, this.currentVersion.toString());
+            }
+        } catch (e) {
+            console.error('Failed to check learning version:', e);
+        }
     }
 
     private loadFromStorage(): void {

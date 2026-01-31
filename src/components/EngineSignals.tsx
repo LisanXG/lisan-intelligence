@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import SignalCard from './SignalCard';
+import QuantView from './QuantView';
 import { SignalOutput } from '@/lib/engine';
 
 interface EngineSignal extends SignalOutput {
@@ -34,6 +35,7 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
     const [error, setError] = useState<string | null>(null);
     const [lastUpdated, setLastUpdated] = useState<string>('');
     const [filter, setFilter] = useState<'ALL' | 'LONG' | 'SHORT' | 'HOLD'>('ALL');
+    const [viewMode, setViewMode] = useState<'signals' | 'quant'>('signals');
 
     useEffect(() => {
         async function fetchSignals() {
@@ -105,16 +107,16 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
                 }
 
                 // SECOND: Track new LONG/SHORT signals
-                // Improved deduplication: use signal ID based on coin + timestamp window
+                // Improved deduplication: check ALL signals from last hour (not just OPEN)
+                // This prevents re-adding signals that closed quickly
                 const now = Date.now();
                 const oneHourAgo = now - (60 * 60 * 1000);
 
-                // Only consider recent open signals for deduplication
-                const recentOpenSignals = history.getAll().filter(s =>
-                    s.outcome === 'OPEN' &&
+                // Check all signals from last hour to prevent duplicates
+                const recentSignals = history.getAll().filter(s =>
                     new Date(s.signal.timestamp).getTime() > oneHourAgo
                 );
-                const existingCoins = new Set(recentOpenSignals.map(s => s.signal.coin));
+                const existingCoins = new Set(recentSignals.map(s => s.signal.coin));
 
                 const actionableSignals = newSignals.filter(s =>
                     s.direction !== 'HOLD' &&
@@ -197,15 +199,52 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
         <div className="space-y-6">
             {/* Filter tabs - aligned right (hidden when hideFilterTabs is true) */}
             {!hideFilterTabs && (
-                <div className="flex justify-end">
-                    <div className="flex gap-1 p-1 bg-[var(--card-bg)] rounded-lg border border-[var(--border-primary)]">
+                <div className="flex justify-between items-center">
+                    {/* View Toggle */}
+                    <div className="flex gap-1 p-1 bg-[var(--bg-card)] rounded-lg border border-[var(--border-primary)]">
+                        <button
+                            onClick={() => setViewMode('signals')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'signals'
+                                ? 'bg-[var(--accent-cyan)] text-white'
+                                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                                }`}
+                        >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="3" y="3" width="7" height="7" />
+                                <rect x="14" y="3" width="7" height="7" />
+                                <rect x="3" y="14" width="7" height="7" />
+                                <rect x="14" y="14" width="7" height="7" />
+                            </svg>
+                            Cards
+                        </button>
+                        <button
+                            onClick={() => setViewMode('quant')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'quant'
+                                ? 'bg-[var(--accent-cyan)] text-white'
+                                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                                }`}
+                        >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <line x1="8" y1="6" x2="21" y2="6" />
+                                <line x1="8" y1="12" x2="21" y2="12" />
+                                <line x1="8" y1="18" x2="21" y2="18" />
+                                <line x1="3" y1="6" x2="3.01" y2="6" />
+                                <line x1="3" y1="12" x2="3.01" y2="12" />
+                                <line x1="3" y1="18" x2="3.01" y2="18" />
+                            </svg>
+                            Quant
+                        </button>
+                    </div>
+
+                    {/* Direction Filter */}
+                    <div className="flex gap-1 p-1 bg-[var(--bg-card)] rounded-lg border border-[var(--border-primary)]">
                         {(['ALL', 'LONG', 'SHORT', 'HOLD'] as const).map((f) => (
                             <button
                                 key={f}
                                 onClick={() => setFilter(f)}
                                 className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${filter === f
                                     ? 'bg-[var(--accent-cyan)] text-white'
-                                    : 'text-[#e5e7eb] hover:text-white hover:bg-[rgba(255,255,255,0.1)]'
+                                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                                     }`}
                             >
                                 {f}
@@ -216,13 +255,15 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
                 </div>
             )}
 
-            {/* Signals grid */}
+            {/* Signals display */}
             {filteredSignals.length === 0 ? (
                 <div className="card p-12 text-center">
                     <p className="text-[var(--text-muted)] text-lg">
                         No {filter !== 'ALL' ? filter : ''} signals available
                     </p>
                 </div>
+            ) : viewMode === 'quant' ? (
+                <QuantView signals={filteredSignals} />
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {filteredSignals.map((signal) => (

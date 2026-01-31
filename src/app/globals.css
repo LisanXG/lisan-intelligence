@@ -404,4 +404,74 @@ p {
   .table-row {
     padding: var(--space-md);
   }
+
+  /* Card adjustments */
+  .card {
+    padding: var(--space-md);
+  }
+
+  /* QuantView table horizontal scroll */
+  .card table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Signal card breakdowns stack */
+  .card .flex.justify-between.text-base {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* Toggle buttons smaller */
+  .flex.gap-1.p-1 button {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* Extra small devices (iPhone SE, etc.) */
+@media (max-width: 375px) {
+  html {
+    font-size: 14px;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  /* Stack header controls */
+  .flex.justify-between.items-center {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  /* Full width buttons on mobile */
+  .flex.gap-1.p-1 {
+    width: 100%;
+  }
+
+  .flex.gap-1.p-1 button {
+    flex: 1;
+    text-align: center;
+  }
+
+  /* Proof page stat cards */
+  .grid.grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Score badge smaller */
+  .score-badge {
+    font-size: 1.75rem !important;
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  /* Price rows wrap */
+  .flex.justify-between.text-base.py-3 {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 }

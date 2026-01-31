@@ -91,7 +91,7 @@ So I curated a list. These are assets with deep liquidity, significant trading v
 | BTC | ETH | SOL | BNB | AVAX |
 | SUI | APT | HYPE | LINK | AAVE |
 | UNI | XRP | ADA | DOT | ATOM |
-| MATIC | ARB | OP | DOGE | PEPE |
+| MATIC | ARB | OP | DOGE | TIA |
 
 **Explicit Exclusions:**
 - **Stablecoins** (USDT, USDC, DAI) — No directional opportunity. They're pegged.

@@ -59,7 +59,7 @@ class SignalHistory {
     private signals: SignalRecord[] = [];
     private readonly storageKey = 'lisan_signal_history';
     private readonly versionKey = 'lisan_tracking_version';
-    private readonly currentVersion = 2; // v2 = WebSocket-based tracking
+    private readonly currentVersion = 3; // v3 = Fixed deduplication bug
     private readonly maxHistory = 1000; // Keep last 1000 signals
 
     constructor() {

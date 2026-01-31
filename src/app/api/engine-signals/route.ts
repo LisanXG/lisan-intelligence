@@ -200,7 +200,7 @@ const COINS_TO_ANALYZE = [
     { symbol: 'OP', name: 'Optimism', image: 'https://assets.coingecko.com/coins/images/25244/small/Optimism.png' },
     // Memes (high volume)
     { symbol: 'DOGE', name: 'Dogecoin', image: 'https://assets.coingecko.com/coins/images/5/small/dogecoin.png' },
-    { symbol: 'PEPE', name: 'Pepe', image: 'https://assets.coingecko.com/coins/images/29850/small/pepe-token.jpeg' },
+    { symbol: 'TIA', name: 'Celestia', image: 'https://assets.coingecko.com/coins/images/31967/small/tia.jpg' },
 ];
 
 export interface EngineSignalResponse {
