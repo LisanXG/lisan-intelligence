@@ -610,6 +610,34 @@ export default function DocsPage() {
                             </div>
                         </Accordion>
 
+                        <Accordion title="Real-Time Signal Tracking">
+                            <p className="mb-6">
+                                When a signal is generated, the system needs to know when it hits its stop loss or take profit.
+                                This is harder than it sounds.
+                            </p>
+
+                            <p className="mb-6">
+                                A naive approach would be to check the current price every few minutes.
+                                But if price spikes to your TP at 2:01 PM and crashes back down by 2:05 PM, you&apos;d never see it.
+                                The signal would stay &quot;open&quot; forever, or worse — eventually get marked as a loss when it should have been a win.
+                            </p>
+
+                            <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-6 mb-6">
+                                <p className="font-semibold text-cyan-800 mb-2">Hyperliquid WebSocket Integration</p>
+                                <p className="text-slate-600">
+                                    The Lisan Core Engine uses <strong>real-time WebSocket feeds from Hyperliquid</strong> to solve this.
+                                    Every minute, we receive candle data with the high and low for that minute.
+                                    If the high touched your take profit, you won. If the low touched your stop loss, you lost.
+                                    No gaps. No missed exits.
+                                </p>
+                            </div>
+
+                            <p className="text-slate-500">
+                                This is the same data infrastructure professional traders use.
+                                The difference is, you don&apos;t have to build it yourself.
+                            </p>
+                        </Accordion>
+
                         <Accordion title="Data Sources — Where It All Comes From">
                             <p className="mb-6">
                                 Transparency matters. Here&apos;s exactly where the engine gets its data:
@@ -645,18 +673,23 @@ export default function DocsPage() {
                                             <td className="py-4 pr-4">Hyperliquid Meta API</td>
                                             <td className="py-4">30 seconds</td>
                                         </tr>
-                                        <tr>
+                                        <tr className="border-b border-slate-100">
                                             <td className="py-4 pr-4">Open Interest</td>
                                             <td className="py-4 pr-4">Hyperliquid Meta API</td>
                                             <td className="py-4">30 seconds</td>
+                                        </tr>
+                                        <tr className="bg-cyan-50">
+                                            <td className="py-4 pr-4 font-semibold text-cyan-700">Signal Tracking</td>
+                                            <td className="py-4 pr-4 font-semibold text-cyan-700">Hyperliquid WebSocket</td>
+                                            <td className="py-4 font-semibold text-cyan-700">Real-time (1m candles)</td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
 
                             <p className="mt-6 text-slate-500">
-                                All API calls happen server-side. Your browser never contacts these APIs directly.
-                                This protects rate limits and keeps the architecture clean.
+                                All API calls happen server-side. Your browser never contacts these APIs directly —
+                                except for the WebSocket connection, which runs client-side to track open signals in real-time.
                             </p>
                         </Accordion>
 

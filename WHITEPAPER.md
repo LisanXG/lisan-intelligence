@@ -263,21 +263,32 @@ When the engine generates 3 LONG or SHORT signals in a row that hit their stop l
 
 This prevents extreme drift. The system adapts, but within sane boundaries.
 
+### Real-Time Signal Tracking
+
+When a signal is generated, the system needs to know when it hits its stop loss or take profit. This is harder than it sounds.
+
+A naive approach would be to check the current price every few minutes. But if price spikes to your TP at 2:01 PM and crashes back down by 2:05 PM, you'd never see it. The signal would stay "open" forever, or worse — eventually get marked as a loss when it should have been a win.
+
+The Lisan Core Engine uses **real-time WebSocket feeds from Hyperliquid** to solve this. Every minute, we receive candle data with the high and low for that minute. If the high touched your take profit, you won. If the low touched your stop loss, you lost. No gaps. No missed exits.
+
+This is the same data infrastructure professional traders use. The difference is, you don't have to build it yourself.
+
 ---
 
 ## Data Sources — Where It All Comes From
 
 Transparency matters. Here's exactly where the engine gets its data:
 
-| Data Type | Source | Cache TTL |
-|-----------|--------|-----------|
-| OHLCV Price Data | Binance Public API (no auth required) | 5 minutes |
+| Data Type | Source | Update Frequency |
+|-----------|--------|------------------|
+| OHLCV Price Data | Binance Public API | 5 minutes |
 | HYPE Token Data | Hyperliquid Candle API | 5 minutes |
 | Fear & Greed Index | Alternative.me | 1 hour |
 | Funding Rates | Hyperliquid Meta API | 30 seconds |
 | Open Interest | Hyperliquid Meta API | 30 seconds |
+| **Signal Tracking** | **Hyperliquid WebSocket** | **Real-time (1m candles)** |
 
-All API calls happen server-side. Your browser never contacts these APIs directly. This protects rate limits and keeps the architecture clean.
+All API calls happen server-side. Your browser never contacts these APIs directly — except for the WebSocket connection, which runs client-side to track open signals in real-time.
 
 ---
 
