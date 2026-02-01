@@ -1,0 +1,12 @@
+{
+    "crons": [
+        {
+            "path": "/api/cron/monitor?secret=lisan-cron-2026-secret-key",
+            "schedule": "0 0 * * *"
+        },
+        {
+            "path": "/api/cron/generate?secret=lisan-cron-2026-secret-key",
+            "schedule": "0 12 * * *"
+        }
+    ]
+}
