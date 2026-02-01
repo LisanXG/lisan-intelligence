@@ -107,19 +107,19 @@ export interface DbLearningCycle {
 // ============================================================================
 
 /**
- * Check if a signal can be added (no existing PENDING signal for same coin+direction)
+ * Check if a signal can be added (no existing PENDING signal for same coin)
+ * Only ONE pending signal per coin allowed - prevents duplicates
  */
 export async function canAddSignal(
     userId: string,
     coin: string,
-    direction: string
+    _direction: string // Kept for API compatibility but not used
 ): Promise<boolean> {
     const { data, error } = await supabase
         .from('signals')
         .select('id')
         .eq('user_id', userId)
         .eq('coin', coin)
-        .eq('direction', direction)
         .eq('outcome', 'PENDING')
         .maybeSingle();
 
@@ -128,7 +128,7 @@ export async function canAddSignal(
         return false; // Fail safe - don't add if we can't check
     }
 
-    return !data; // Can add only if no existing PENDING signal
+    return !data; // Can add only if no existing PENDING signal for this coin
 }
 
 /**
