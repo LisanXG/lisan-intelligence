@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import { useAuth } from '@/context/auth-context';
 
 export default function Header() {
     const pathname = usePathname();
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const { user, signOut } = useAuth();
 
     const navLinks = [
         { href: '/', label: 'Dashboard' },
@@ -16,6 +18,10 @@ export default function Header() {
         { href: '/learning', label: 'Learning' },
         { href: '/docs', label: 'Docs' },
     ];
+
+    const handleSignOut = async () => {
+        await signOut();
+    };
 
     return (
         <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-2xl border-b border-slate-200/50">
@@ -68,7 +74,7 @@ export default function Header() {
                     })}
                 </nav>
 
-                {/* Right: Live Data + Date (Desktop) */}
+                {/* Right: User + Live Data (Desktop) */}
                 <div className="hidden lg:flex items-center gap-5">
                     <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
@@ -77,8 +83,21 @@ export default function Header() {
                     <span className="text-base text-slate-500">
                         {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     </span>
+                    {user && (
+                        <div className="flex items-center gap-3">
+                            <span className="text-sm text-slate-500 truncate max-w-32">
+                                {user.email}
+                            </span>
+                            <button
+                                onClick={handleSignOut}
+                                className="text-sm font-medium text-slate-500 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50"
+                            >
+                                Sign Out
+                            </button>
+                        </div>
+                    )}
                     <span className="text-sm text-slate-400 font-mono bg-slate-100/80 px-3 py-1.5 rounded-lg">
-                        v0.1.0
+                        v0.2.0
                     </span>
                 </div>
             </div>
@@ -104,14 +123,26 @@ export default function Header() {
                             );
                         })}
                     </nav>
-                    {/* Mobile: Live indicator */}
+                    {/* Mobile: User + Live indicator */}
                     <div className="px-4 pb-4 flex items-center gap-2 text-sm text-slate-500">
                         <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
                         <span>Live Data</span>
-                        <span className="ml-auto font-mono text-xs bg-slate-100 px-2 py-1 rounded">v0.1.0</span>
+                        {user && (
+                            <>
+                                <span className="ml-2 truncate max-w-32">{user.email}</span>
+                                <button
+                                    onClick={handleSignOut}
+                                    className="ml-2 text-red-500 font-medium"
+                                >
+                                    Sign Out
+                                </button>
+                            </>
+                        )}
+                        <span className="ml-auto font-mono text-xs bg-slate-100 px-2 py-1 rounded">v0.2.0</span>
                     </div>
                 </div>
             )}
         </header>
     );
 }
+

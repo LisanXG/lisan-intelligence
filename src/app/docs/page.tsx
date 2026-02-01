@@ -593,8 +593,8 @@ export default function DocsPage() {
                                     This is gradual, not dramatic. We&apos;re adjusting, not panic-selling.
                                 </li>
                                 <li>
-                                    <strong>Persist the changes</strong> — New weights are saved to localStorage.
-                                    The system remembers. Next time you load the page, the adjusted weights are active.
+                                    <strong>Persist the changes</strong> — New weights are saved to your account in the database.
+                                    The system remembers. Log in from any device, your adapted weights are active.
                                 </li>
                             </ol>
 
@@ -785,6 +785,74 @@ export default function DocsPage() {
                                         For quants, researchers, and anyone who wants to build on top of the data.
                                     </p>
                                 </div>
+                            </div>
+                        </Accordion>
+
+                        <Accordion title="Authentication & Data Persistence">
+                            <p className="mb-6">
+                                LISAN INTELLIGENCE now includes user authentication and cloud-based data persistence.
+                                Your signals, watchlist, and learning progress are tied to your account — not your browser.
+                            </p>
+
+                            <div className="space-y-8">
+                                <div>
+                                    <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                        <span className="text-cyan-600">🔐</span>
+                                        Account System
+                                    </h4>
+                                    <p className="text-slate-600 mb-3">
+                                        Simple email/password authentication. No social logins, no OAuth complexity.
+                                        Create an account once, access your data from any device.
+                                    </p>
+                                    <ul className="list-disc list-inside space-y-1 text-slate-600 ml-4 mb-3">
+                                        <li><strong>Email + Password</strong> — Standard authentication</li>
+                                        <li><strong>Session Persistence</strong> — Stay logged in across browser sessions</li>
+                                        <li><strong>Protected Routes</strong> — Dashboard and tools require authentication</li>
+                                    </ul>
+                                </div>
+
+                                <div>
+                                    <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                        <span className="text-cyan-600">☁️</span>
+                                        Cloud Data Storage
+                                    </h4>
+                                    <p className="text-slate-600 mb-3">
+                                        Previously, all data lived in localStorage — tied to one browser, easily lost.
+                                        Now everything is stored in a PostgreSQL database:
+                                    </p>
+                                    <ul className="list-disc list-inside space-y-1 text-slate-600 ml-4 mb-3">
+                                        <li><strong>Signals</strong> — Every generated signal with full indicator snapshots</li>
+                                        <li><strong>Outcomes</strong> — Win/loss records with exit prices and reasons</li>
+                                        <li><strong>Watchlist</strong> — Your tracked assets with add prices</li>
+                                        <li><strong>Learning Weights</strong> — Personalized indicator weights that adapt to your history</li>
+                                    </ul>
+                                </div>
+
+                                <div>
+                                    <h4 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                                        <span className="text-cyan-600">🛡️</span>
+                                        Security
+                                    </h4>
+                                    <p className="text-slate-600 mb-3">
+                                        Data isolation is enforced at the database level:
+                                    </p>
+                                    <ul className="list-disc list-inside space-y-1 text-slate-600 ml-4">
+                                        <li><strong>Row Level Security (RLS)</strong> — You can only access your own data</li>
+                                        <li><strong>No Cross-User Visibility</strong> — Users cannot see each other&apos;s signals or watchlists</li>
+                                        <li><strong>Passwords Hashed</strong> — Standard industry practices</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-50 rounded-lg p-4 mt-6">
+                                <p className="font-semibold text-slate-700 mb-2">Why Not localStorage Anymore?</p>
+                                <p className="text-slate-600">
+                                    localStorage is convenient for prototypes, but it has real problems:
+                                    data gets wiped when you clear browser cache, it doesn&apos;t sync across devices,
+                                    and there&apos;s no way to analyze aggregate performance. Moving to a database
+                                    solves all of these while enabling future features like public leaderboards
+                                    and cross-device sync.
+                                </p>
                             </div>
                         </Accordion>
 

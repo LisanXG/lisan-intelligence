@@ -1,9 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import SignalCard from './SignalCard';
 import QuantView from './QuantView';
 import { SignalOutput } from '@/lib/engine';
+import { useAuth } from '@/context/auth-context';
+import {
+    getOpenSignals,
+    addSignalToDb,
+    updateSignalOutcome as updateSignalInDb,
+    getTrackingStats,
+    DbSignal
+} from '@/lib/supabase';
 
 interface EngineSignal extends SignalOutput {
     name: string;
@@ -27,8 +35,20 @@ interface EngineSignalsProps {
  * 
  * Displays signals using the new scoring engine with
  * LONG/SHORT/HOLD directions and premium card design.
+ * Now uses Supabase for signal persistence and deduplication.
  */
+
+// Helper to convert score to confidence label
+function getConfidenceLabel(score: number): string {
+    if (score >= 75) return 'Very High';
+    if (score >= 60) return 'High';
+    if (score >= 45) return 'Medium';
+    if (score >= 30) return 'Low';
+    return 'Very Low';
+}
+
 export default function EngineSignals({ externalFilter, hideFilterTabs = false }: EngineSignalsProps) {
+    const { user } = useAuth();
     const [signals, setSignals] = useState<EngineSignal[]>([]);
     const [fearGreed, setFearGreed] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
@@ -36,6 +56,132 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
     const [lastUpdated, setLastUpdated] = useState<string>('');
     const [filter, setFilter] = useState<'ALL' | 'LONG' | 'SHORT' | 'HOLD'>('ALL');
     const [viewMode, setViewMode] = useState<'signals' | 'quant'>('signals');
+    const [openSignals, setOpenSignals] = useState<DbSignal[]>([]);
+
+
+    // Track signals to Supabase
+    const trackSignals = useCallback(async (newSignals: EngineSignal[]) => {
+        if (!user) return;
+
+        try {
+            // Get current open signals from Supabase
+            const currentOpenSignals = await getOpenSignals(user.id);
+            setOpenSignals(currentOpenSignals);
+
+            // Create a set of existing coin+direction combos that are PENDING
+            const existingPendingKeys = new Set(
+                currentOpenSignals.map(s => `${s.coin}:${s.direction}`)
+            );
+
+            // FIRST: Check and update outcomes for open signals
+            for (const openSignal of currentOpenSignals) {
+                const currentMarketSignal = newSignals.find(s => s.coin === openSignal.coin);
+                if (!currentMarketSignal) continue;
+
+                const currentPrice = currentMarketSignal.entryPrice; // entryPrice from API is current market price
+                const outcome = checkOutcome(openSignal, currentPrice);
+
+                if (outcome) {
+                    console.log(`[Signal] ${openSignal.coin} ${outcome.outcome} - ${outcome.reason}`);
+                    await updateSignalInDb(
+                        openSignal.id,
+                        outcome.outcome,
+                        currentPrice,
+                        outcome.reason,
+                        outcome.profitPct
+                    );
+
+                    // Check if we should trigger learning after this update
+                    const stats = await getTrackingStats(user.id);
+                    if (stats.consecutiveLosses >= 3) {
+                        console.log('[Learning] Triggering learning cycle - 3 consecutive losses detected');
+                        // Run learning cycle (still uses localStorage for now)
+                        import('@/lib/engine/learning').then(({ checkAndTriggerLearning }) => {
+                            checkAndTriggerLearning();
+                        }).catch(() => {
+                            // Learning module not available
+                        });
+                    }
+                }
+            }
+
+            // SECOND: Track new LONG/SHORT signals (with deduplication)
+            const actionableSignals = newSignals.filter(s =>
+                s.direction !== 'HOLD' &&
+                !existingPendingKeys.has(`${s.coin}:${s.direction}`)
+            );
+
+            // Import current weights
+            const weights = await import('@/lib/engine/learning').then(
+                m => m.getCurrentWeights()
+            ).catch(() => ({}));
+
+            for (const signal of actionableSignals) {
+                const added = await addSignalToDb(user.id, {
+                    coin: signal.coin,
+                    direction: signal.direction,
+                    score: signal.score,
+                    confidence: getConfidenceLabel(signal.score),
+                    entry_price: signal.entryPrice,
+                    stop_loss: signal.stopLoss,
+                    take_profit: signal.takeProfit,
+                    indicator_snapshot: signal.indicators,
+                    weights_used: weights as Record<string, number>,
+                });
+
+                if (added) {
+                    console.log(`[Signal] Added ${signal.coin} ${signal.direction} to tracking`);
+
+                    // Subscribe to WebSocket for this coin
+                    import('@/lib/engine/websocket').then(({ getHyperliquidWebSocket }) => {
+                        getHyperliquidWebSocket().subscribe(signal.coin);
+                    });
+                }
+            }
+
+            // Refresh open signals
+            const updatedOpenSignals = await getOpenSignals(user.id);
+            setOpenSignals(updatedOpenSignals);
+
+        } catch (err) {
+            console.error('[Signal] Error tracking signals:', err);
+        }
+    }, [user]);
+
+    // Check if a signal should close (hit SL or TP)
+    const checkOutcome = (
+        signal: DbSignal,
+        currentPrice: number
+    ): { outcome: 'WON' | 'LOST'; reason: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT'; profitPct: number } | null => {
+        const { entry_price, stop_loss, take_profit, direction } = signal;
+        const WIN_THRESHOLD_PCT = 3;
+
+        if (direction === 'LONG') {
+            const profitPct = ((currentPrice - entry_price) / entry_price) * 100;
+            if (currentPrice >= take_profit) {
+                return { outcome: 'WON', reason: 'TAKE_PROFIT', profitPct };
+            }
+            if (profitPct >= WIN_THRESHOLD_PCT) {
+                return { outcome: 'WON', reason: 'TARGET_3_PERCENT', profitPct };
+            }
+            if (currentPrice <= stop_loss) {
+                return { outcome: 'LOST', reason: 'STOP_LOSS', profitPct };
+            }
+        } else if (direction === 'SHORT') {
+            const profitPct = ((entry_price - currentPrice) / entry_price) * 100;
+            if (currentPrice <= take_profit) {
+                return { outcome: 'WON', reason: 'TAKE_PROFIT', profitPct };
+            }
+            if (profitPct >= WIN_THRESHOLD_PCT) {
+                return { outcome: 'WON', reason: 'TARGET_3_PERCENT', profitPct };
+            }
+            if (currentPrice >= stop_loss) {
+                return { outcome: 'LOST', reason: 'STOP_LOSS', profitPct };
+            }
+        }
+
+        return null;
+    };
 
     useEffect(() => {
         async function fetchSignals() {
@@ -53,8 +199,7 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
                 setLastUpdated(data.lastUpdated);
                 setError(null);
 
-                // Track LONG/SHORT signals to learning system
-                // Only track if we have signals and they're actionable
+                // Track LONG/SHORT signals to Supabase
                 if (data.signals && data.signals.length > 0) {
                     trackSignals(data.signals);
                 }
@@ -82,59 +227,8 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
                 getHyperliquidWebSocket().disconnect();
             });
         };
-    }, []);
+    }, [trackSignals]);
 
-    // Track signals to the learning system
-    const trackSignals = (newSignals: EngineSignal[]) => {
-        // Import tracking functions dynamically to avoid SSR issues
-        import('@/lib/engine/tracking').then(({ getSignalHistory, checkAndUpdateOutcomes }) => {
-            import('@/lib/engine/learning').then(({ getCurrentWeights, checkAndTriggerLearning }) => {
-                const history = getSignalHistory();
-                const weights = getCurrentWeights();
-
-                // FIRST: Check all open signals against current prices
-                // This is what marks signals as WIN/LOSS when SL/TP is hit
-                const priceUpdates = newSignals.map(s => ({
-                    coin: s.coin,
-                    currentPrice: s.entryPrice // entryPrice from API is the current market price
-                }));
-                const updatedSignals = checkAndUpdateOutcomes(priceUpdates);
-
-                if (updatedSignals.length > 0) {
-                    console.log(`[Learning] Updated ${updatedSignals.length} signal outcomes`);
-                    // Check if we should run a learning cycle after updating outcomes
-                    checkAndTriggerLearning();
-                }
-
-                // SECOND: Track new LONG/SHORT signals
-                // Improved deduplication: check ALL signals from last hour (not just OPEN)
-                // This prevents re-adding signals that closed quickly
-                const now = Date.now();
-                const oneHourAgo = now - (60 * 60 * 1000);
-
-                // Check all signals from last hour to prevent duplicates
-                const recentSignals = history.getAll().filter(s =>
-                    new Date(s.signal.timestamp).getTime() > oneHourAgo
-                );
-                const existingCoins = new Set(recentSignals.map(s => s.signal.coin));
-
-                const actionableSignals = newSignals.filter(s =>
-                    s.direction !== 'HOLD' &&
-                    !existingCoins.has(s.coin)
-                );
-
-                for (const signal of actionableSignals) {
-                    // Cast weights to Record<string, number> for addSignal
-                    history.addSignal(signal, weights as unknown as Record<string, number>);
-
-                    // Subscribe to WebSocket for this coin
-                    import('@/lib/engine/websocket').then(({ getHyperliquidWebSocket }) => {
-                        getHyperliquidWebSocket().subscribe(signal.coin);
-                    });
-                }
-            });
-        });
-    };
 
     // Use external filter if provided, otherwise use internal state
     const activeFilter = externalFilter ?? filter;

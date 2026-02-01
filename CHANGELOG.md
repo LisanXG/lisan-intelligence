@@ -5,6 +5,26 @@ All notable changes to LISAN INTELLIGENCE will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-02-01
+
+### Added
+- **User Authentication** — Email/password login and signup via Supabase Auth
+- **Cloud Data Persistence** — Signals, watchlist, and learning weights stored in PostgreSQL
+- **Protected Routes** — AuthGate wrapper requires login to access platform features
+- **Session Management** — Persistent sessions across browser refreshes
+- **Row Level Security** — Each user can only access their own data
+
+### Changed
+- Migrated signal tracking from localStorage to Supabase database
+- Migrated watchlist from localStorage to Supabase database  
+- Updated learning system to persist weights per-user in database
+- Premium login card redesign with animated gradient background
+
+### Technical
+- Added `@supabase/supabase-js` and `@supabase/ssr` dependencies
+- Created `signals`, `watchlist`, `user_weights`, and `learning_cycles` tables
+- Implemented RLS policies for data isolation
+
 ## [0.2.0] - 2026-01-31
 
 ### Added

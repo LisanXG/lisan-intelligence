@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display, Dancing_Script } from "next/font/google";
 import "./globals.css";
 import AnimatedBackground from "@/components/AnimatedBackground";
+import Providers from "@/components/Providers";
 import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({
@@ -36,10 +37,13 @@ export default function RootLayout({
       <body className={`${inter.variable} ${playfair.variable} ${dancingScript.variable} antialiased`}>
         <AnimatedBackground />
         <div className="relative z-10">
-          {children}
+          <Providers>
+            {children}
+          </Providers>
         </div>
       </body>
       <Analytics />
     </html>
   );
 }
+

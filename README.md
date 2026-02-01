@@ -29,6 +29,8 @@ LISAN INTELLIGENCE is a research tool that analyzes cryptocurrency markets using
 - **Shareable Signal Cards** — Generate PNGs and share to X/Twitter
 - **Quant View** — Dense data table with CSV export for institutional workflows
 - **Watchlist** — Track assets and monitor price changes from when you added them
+- **User Authentication** — Email/password login with cloud data persistence
+- **Cross-Device Sync** — Your signals, watchlist, and learning progress sync across devices
 
 ---
 
@@ -37,6 +39,7 @@ LISAN INTELLIGENCE is a research tool that analyzes cryptocurrency markets using
 - **Framework:** Next.js 14 (App Router)
 - **Language:** TypeScript
 - **Styling:** Tailwind CSS
+- **Database:** Supabase (PostgreSQL + Auth)
 - **Data Sources:** Binance API, Hyperliquid API, Alternative.me
 - **Deployment:** Vercel
 

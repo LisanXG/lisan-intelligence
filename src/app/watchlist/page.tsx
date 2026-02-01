@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import Header from '@/components/Header';
 import Link from 'next/link';
-import { getWatchlist, WatchlistItem, toggleWatchlist } from '@/lib/watchlist';
 import { SignalOutput } from '@/lib/engine';
 import {
     requestNotificationPermission,
@@ -11,6 +10,12 @@ import {
     checkForSignalChanges,
     saveSignalStates
 } from '@/lib/alerts';
+import { useAuth } from '@/context/auth-context';
+import {
+    getWatchlist as getWatchlistFromDb,
+    removeFromWatchlist,
+    DbWatchlistItem
+} from '@/lib/supabase';
 
 interface EngineSignal extends SignalOutput {
     name: string;
@@ -26,7 +31,8 @@ interface WatchedSignal extends EngineSignal {
 }
 
 export default function WatchlistPage() {
-    const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+    const { user } = useAuth();
+    const [watchlist, setWatchlist] = useState<DbWatchlistItem[]>([]);
     const [signals, setSignals] = useState<WatchedSignal[]>([]);
     const [loading, setLoading] = useState(true);
     const [alertsEnabled, setAlertsEnabled] = useState(false);
@@ -38,18 +44,20 @@ export default function WatchlistPage() {
 
     // Load watchlist and fetch matching signals
     const loadData = useCallback(async () => {
+        if (!user) return;
+
         setLoading(true);
 
-        const list = getWatchlist();
-        setWatchlist(list);
-
-        if (list.length === 0) {
-            setSignals([]);
-            setLoading(false);
-            return;
-        }
-
         try {
+            const list = await getWatchlistFromDb(user.id);
+            setWatchlist(list);
+
+            if (list.length === 0) {
+                setSignals([]);
+                setLoading(false);
+                return;
+            }
+
             const res = await fetch('/api/engine-signals');
             const data = await res.json();
             const allSignals = data.signals || [];
@@ -67,14 +75,14 @@ export default function WatchlistPage() {
                 .filter((s: EngineSignal) => watchlistCoins.has(s.coin))
                 .map((s: EngineSignal) => {
                     const watchItem = list.find(w => w.coin === s.coin);
-                    const priceAtAdd = watchItem?.priceAtAdd || s.entryPrice;
+                    const priceAtAdd = watchItem?.price_at_add || s.entryPrice;
                     const priceChange = s.entryPrice - priceAtAdd;
                     const priceChangePercent = priceAtAdd > 0 ? (priceChange / priceAtAdd) * 100 : 0;
 
                     return {
                         ...s,
                         priceAtAdd,
-                        addedAt: watchItem?.addedAt || new Date().toISOString(),
+                        addedAt: watchItem?.added_at || new Date().toISOString(),
                         priceChange,
                         priceChangePercent
                     };
@@ -86,7 +94,7 @@ export default function WatchlistPage() {
         }
 
         setLoading(false);
-    }, []);
+    }, [user]);
 
     useEffect(() => {
         loadData();
@@ -112,8 +120,9 @@ export default function WatchlistPage() {
     };
 
     // Handle watchlist removal
-    const handleRemove = (coin: string, price: number) => {
-        toggleWatchlist(coin, price);
+    const handleRemove = async (coin: string) => {
+        if (!user) return;
+        await removeFromWatchlist(user.id, coin);
         loadData();
     };
 
@@ -312,7 +321,7 @@ export default function WatchlistPage() {
                                         </td>
                                         <td className="py-4 px-4 text-center">
                                             <button
-                                                onClick={() => handleRemove(signal.coin, signal.entryPrice)}
+                                                onClick={() => handleRemove(signal.coin)}
                                                 className="text-amber-500 hover:text-amber-600 p-2 rounded-lg hover:bg-amber-50 transition-all"
                                                 title="Remove from watchlist"
                                             >

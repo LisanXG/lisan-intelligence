@@ -1,10 +1,15 @@
 'use client';
 
 import { SignalOutput } from '@/lib/engine';
-import { useState, useEffect } from 'react';
-import { isInWatchlist, toggleWatchlist } from '@/lib/watchlist';
+import { useState, useEffect, useCallback } from 'react';
 import { getScoreBucketWinRate } from '@/lib/engine/stats';
 import ShareButton from './ShareButton';
+import { useAuth } from '@/context/auth-context';
+import {
+    isInWatchlist as isInWatchlistDb,
+    addToWatchlist,
+    removeFromWatchlist
+} from '@/lib/supabase';
 
 interface SignalCardProps {
     signal: SignalOutput & { name?: string; image?: string };
@@ -17,6 +22,7 @@ interface SignalCardProps {
  * Clean layout with proper hierarchy and readable text
  */
 export default function SignalCard({ signal, sparklineData, onWatchlistChange }: SignalCardProps) {
+    const { user } = useAuth();
     const { coin, direction, score, entryPrice, stopLoss, takeProfit, riskRewardRatio, breakdown } = signal;
     const image = (signal as { image?: string }).image;
     const name = (signal as { name?: string }).name || coin;
@@ -25,18 +31,31 @@ export default function SignalCard({ signal, sparklineData, onWatchlistChange }:
     const [isWatched, setIsWatched] = useState(false);
     const [bucketContext, setBucketContext] = useState<{ winRate: number; sampleSize: number } | null>(null);
 
-    // Check watchlist status and get score bucket context on mount
+    // Check watchlist status on mount
+    const checkWatchlistStatus = useCallback(async () => {
+        if (!user) return;
+        const inWatchlist = await isInWatchlistDb(user.id, coin);
+        setIsWatched(inWatchlist);
+    }, [user, coin]);
+
     useEffect(() => {
-        setIsWatched(isInWatchlist(coin));
+        checkWatchlistStatus();
         const context = getScoreBucketWinRate(score);
         setBucketContext(context);
-    }, [coin, score]);
+    }, [checkWatchlistStatus, score]);
 
     // Handle watchlist toggle
-    const handleWatchlistClick = (e: React.MouseEvent) => {
+    const handleWatchlistClick = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        const newState = toggleWatchlist(coin, entryPrice);
-        setIsWatched(newState);
+        if (!user) return;
+
+        if (isWatched) {
+            await removeFromWatchlist(user.id, coin);
+            setIsWatched(false);
+        } else {
+            await addToWatchlist(user.id, coin, entryPrice);
+            setIsWatched(true);
+        }
         onWatchlistChange?.();
     };
 
