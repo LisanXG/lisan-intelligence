@@ -1,26 +1,58 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Header from '@/components/Header';
 import { getCurrentWeights, getLearningHistory, resetWeightsToDefault, LearningCycle } from '@/lib/engine/learning';
 import { IndicatorWeights, DEFAULT_WEIGHTS } from '@/lib/engine/scoring';
-import { getSignalHistory, SignalRecord, TrackingStats } from '@/lib/engine/tracking';
+import { useAuth } from '@/context/auth-context';
+import { getUserSignals, getTrackingStats, DbSignal } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
+
+interface TrackingStats {
+    totalSignals: number;
+    openSignals: number;
+    wins: number;
+    losses: number;
+    winRate: number;
+    avgProfit: number;
+    avgLoss: number;
+    consecutiveLosses: number;
+}
 
 export default function LearningPage() {
+    const { user } = useAuth();
     const [weights, setWeights] = useState<IndicatorWeights>(DEFAULT_WEIGHTS);
     const [history, setHistory] = useState<LearningCycle[]>([]);
-    const [signals, setSignals] = useState<SignalRecord[]>([]);
+    const [signals, setSignals] = useState<DbSignal[]>([]);
     const [stats, setStats] = useState<TrackingStats | null>(null);
     const [mounted, setMounted] = useState(false);
+
+    const loadData = useCallback(async () => {
+        if (!user) return;
+
+        try {
+            const [userSignals, userStats] = await Promise.all([
+                getUserSignals(user.id),
+                getTrackingStats(user.id)
+            ]);
+            setSignals(userSignals);
+            setStats(userStats);
+        } catch (error) {
+            console.error('Failed to load learning data:', error);
+        }
+    }, [user]);
 
     useEffect(() => {
         setMounted(true);
         setWeights(getCurrentWeights());
         setHistory(getLearningHistory());
-        const signalHistory = getSignalHistory();
-        setSignals(signalHistory.getAll());
-        setStats(signalHistory.getStats());
     }, []);
+
+    useEffect(() => {
+        if (mounted && user) {
+            loadData();
+        }
+    }, [mounted, user, loadData]);
 
     const handleReset = () => {
         if (confirm('Reset all weights to defaults? This cannot be undone.')) {
@@ -30,12 +62,30 @@ export default function LearningPage() {
         }
     };
 
-    const handleClearHistory = () => {
+    const handleClearHistory = async () => {
+        if (!user) return;
         if (confirm('Clear all signal history? This cannot be undone.')) {
-            const signalHistory = getSignalHistory();
-            signalHistory.clearAll();
-            setSignals([]);
-            setStats(signalHistory.getStats());
+            try {
+                // Delete all signals for this user from Supabase
+                await supabase
+                    .from('signals')
+                    .delete()
+                    .eq('user_id', user.id);
+
+                setSignals([]);
+                setStats({
+                    totalSignals: 0,
+                    openSignals: 0,
+                    wins: 0,
+                    losses: 0,
+                    winRate: 0,
+                    avgProfit: 0,
+                    avgLoss: 0,
+                    consecutiveLosses: 0,
+                });
+            } catch (error) {
+                console.error('Failed to clear history:', error);
+            }
         }
     };
 
@@ -222,28 +272,28 @@ export default function LearningPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {signals.slice().reverse().slice(0, 50).map(record => (
+                                        {signals.slice(0, 50).map(record => (
                                             <tr key={record.id} className="hover:bg-slate-50">
-                                                <td className="px-4 py-3 font-medium">{record.signal.coin}</td>
+                                                <td className="px-4 py-3 font-medium">{record.coin}</td>
                                                 <td className="px-4 py-3">
-                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${record.signal.direction === 'LONG'
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${record.direction === 'LONG'
                                                         ? 'bg-emerald-100 text-emerald-700'
-                                                        : record.signal.direction === 'SHORT'
+                                                        : record.direction === 'SHORT'
                                                             ? 'bg-red-100 text-red-700'
                                                             : 'bg-slate-100 text-slate-700'
                                                         }`}>
-                                                        {record.signal.direction}
+                                                        {record.direction}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3">{record.signal.score}</td>
-                                                <td className="px-4 py-3">${record.signal.entryPrice.toLocaleString()}</td>
-                                                <td className="px-4 py-3 text-red-600">${record.signal.stopLoss.toLocaleString()}</td>
-                                                <td className="px-4 py-3 text-emerald-600">${record.signal.takeProfit.toLocaleString()}</td>
+                                                <td className="px-4 py-3">{record.score}</td>
+                                                <td className="px-4 py-3">${record.entry_price.toLocaleString()}</td>
+                                                <td className="px-4 py-3 text-red-600">${record.stop_loss.toLocaleString()}</td>
+                                                <td className="px-4 py-3 text-emerald-600">${record.take_profit.toLocaleString()}</td>
                                                 <td className="px-4 py-3">
-                                                    {record.outcome === 'OPEN' ? (
+                                                    {record.outcome === 'PENDING' ? (
                                                         <span className="text-slate-400">Pending</span>
                                                     ) : (
-                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${record.outcome === 'WIN'
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${record.outcome === 'WON'
                                                             ? 'bg-emerald-100 text-emerald-700'
                                                             : 'bg-red-100 text-red-700'
                                                             }`}>
@@ -252,7 +302,7 @@ export default function LearningPage() {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-slate-500 text-xs">
-                                                    {new Date(record.signal.timestamp).toLocaleString()}
+                                                    {new Date(record.created_at).toLocaleString()}
                                                 </td>
                                             </tr>
                                         ))}
