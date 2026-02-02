@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/context/auth-context';
 
 // ============================================================================
 // TYPES (from API response)
@@ -60,7 +59,6 @@ interface CumulativeReturn {
 // ============================================================================
 
 export default function ProofPage() {
-    const { user } = useAuth();
     const [bucketStats, setBucketStats] = useState<ScoreBucketStats[]>([]);
     const [summary, setSummary] = useState<PerformanceSummary | null>(null);
     const [recentOutcomes, setRecentOutcomes] = useState<RecentOutcome[]>([]);
@@ -68,33 +66,28 @@ export default function ProofPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const loadStats = useCallback(async () => {
-        if (!user) return;
-
-        try {
-            setIsLoading(true);
-            // Pass user ID to filter by current user's signals
-            const response = await fetch(`/api/proof-stats?userId=${user.id}`);
-            if (!response.ok) throw new Error('Failed to load stats');
-
-            const data = await response.json();
-            setBucketStats(data.bucketStats || []);
-            setSummary(data.summary || null);
-            setRecentOutcomes(data.recentOutcomes || []);
-            setCumulativeReturns(data.cumulativeReturns || []);
-        } catch (err) {
-            setError('Failed to load performance data');
-            console.error(err);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [user]);
-
     useEffect(() => {
-        if (user) {
-            loadStats();
+        async function loadStats() {
+            try {
+                setIsLoading(true);
+                // Fetch ALL signals (public, server-wide proof)
+                const response = await fetch('/api/proof-stats');
+                if (!response.ok) throw new Error('Failed to load stats');
+
+                const data = await response.json();
+                setBucketStats(data.bucketStats || []);
+                setSummary(data.summary || null);
+                setRecentOutcomes(data.recentOutcomes || []);
+                setCumulativeReturns(data.cumulativeReturns || []);
+            } catch (err) {
+                setError('Failed to load performance data');
+                console.error(err);
+            } finally {
+                setIsLoading(false);
+            }
         }
-    }, [user, loadStats]);
+        loadStats();
+    }, []);
 
     if (isLoading) {
         return (

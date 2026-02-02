@@ -75,21 +75,12 @@ const SCORE_BUCKETS = [
 // API HANDLER
 // ============================================================================
 
-export async function GET(request: Request) {
+export async function GET() {
     try {
-        // Get userId from query params
-        const { searchParams } = new URL(request.url);
-        const userId = searchParams.get('userId');
-
-        if (!userId) {
-            return NextResponse.json({ error: 'userId required' }, { status: 400 });
-        }
-
-        // Fetch signals for this specific user
+        // Fetch ALL signals across all users (public proof page)
         const { data: signals, error } = await supabaseServer
             .from('signals')
             .select('id, coin, direction, score, entry_price, exit_price, profit_pct, outcome, exit_reason, created_at, closed_at')
-            .eq('user_id', userId)
             .order('created_at', { ascending: false });
 
         if (error) {
