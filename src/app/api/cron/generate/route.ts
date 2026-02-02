@@ -39,7 +39,7 @@ const COINS_TO_ANALYZE = [
     { symbol: 'AAVE', name: 'Aave' },
     { symbol: 'UNI', name: 'Uniswap' },
     { symbol: 'XRP', name: 'XRP' },
-    { symbol: 'ADA', name: 'Cardano' },
+    { symbol: 'LTC', name: 'Litecoin' },
     { symbol: 'DOT', name: 'Polkadot' },
     { symbol: 'ATOM', name: 'Cosmos' },
     { symbol: 'MATIC', name: 'Polygon' },

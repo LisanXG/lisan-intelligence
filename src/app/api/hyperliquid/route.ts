@@ -54,7 +54,7 @@ export interface HyperliquidData {
 // Coins we track that are also on Hyperliquid
 const HYPERLIQUID_COINS = [
     'BTC', 'ETH', 'SOL', 'BNB', 'AVAX', 'SUI', 'APT', 'HYPE',
-    'LINK', 'AAVE', 'UNI', 'XRP', 'ADA', 'DOT', 'ATOM',
+    'LINK', 'AAVE', 'UNI', 'XRP', 'LTC', 'DOT', 'ATOM',
     'MATIC', 'ARB', 'OP', 'DOGE', 'TIA'
 ];
 

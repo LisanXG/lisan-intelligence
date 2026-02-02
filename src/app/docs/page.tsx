@@ -274,7 +274,7 @@ export default function DocsPage() {
                             </p>
 
                             <div className="grid grid-cols-4 md:grid-cols-5 gap-3 mb-6">
-                                {['BTC', 'ETH', 'SOL', 'BNB', 'AVAX', 'SUI', 'APT', 'HYPE', 'LINK', 'AAVE', 'UNI', 'XRP', 'ADA', 'DOT', 'ATOM', 'MATIC', 'ARB', 'OP', 'DOGE', 'TIA'].map((coin) => (
+                                {['BTC', 'ETH', 'SOL', 'BNB', 'AVAX', 'SUI', 'APT', 'HYPE', 'LINK', 'AAVE', 'UNI', 'XRP', 'LTC', 'DOT', 'ATOM', 'MATIC', 'ARB', 'OP', 'DOGE', 'TIA'].map((coin) => (
                                     <div key={coin} className="py-3 px-4 bg-slate-100 rounded-lg text-center font-semibold text-slate-700">
                                         {coin}
                                     </div>
@@ -593,8 +593,8 @@ export default function DocsPage() {
                                     This is gradual, not dramatic. We&apos;re adjusting, not panic-selling.
                                 </li>
                                 <li>
-                                    <strong>Persist the changes</strong> — New weights are saved to your account in the database.
-                                    The system remembers. Log in from any device, your adapted weights are active.
+                                    <strong>Persist the changes</strong> — New weights are saved globally and shared by all users.
+                                    The collective learning benefits everyone. No account needed to use the adapted weights.
                                 </li>
                             </ol>
 
@@ -689,16 +689,16 @@ export default function DocsPage() {
                                         </tr>
                                         <tr className="bg-cyan-50">
                                             <td className="py-4 pr-4 font-semibold text-cyan-700">Signal Tracking</td>
-                                            <td className="py-4 pr-4 font-semibold text-cyan-700">Hyperliquid WebSocket</td>
-                                            <td className="py-4 font-semibold text-cyan-700">Real-time (1m candles)</td>
+                                            <td className="py-4 pr-4 font-semibold text-cyan-700">Server-side Cron (5-min intervals)</td>
+                                            <td className="py-4 font-semibold text-cyan-700">High/Low candle check</td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
 
                             <p className="mt-6 text-slate-500">
-                                All API calls happen server-side. Your browser never contacts these APIs directly —
-                                except for the WebSocket connection, which runs client-side to track open signals in real-time.
+                                All API calls happen server-side. Your browser never contacts these APIs directly.
+                                Signal tracking also runs server-side via cron jobs, so the engine works 24/7 even when you&apos;re offline.
                             </p>
                         </Accordion>
 

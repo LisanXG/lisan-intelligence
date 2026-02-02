@@ -1,10 +1,43 @@
 import { NextResponse } from 'next/server';
 
-// Server-side API route - fetches from CoinGecko
+// Tracked coins list - must match engine-signals and cron/generate
+const TRACKED_COINS = [
+    'bitcoin', 'ethereum', 'solana', 'binancecoin', 'avalanche-2',
+    'sui', 'aptos', 'hyperliquid', 'chainlink', 'aave',
+    'uniswap', 'ripple', 'litecoin', 'polkadot', 'cosmos',
+    'matic-network', 'arbitrum', 'optimism', 'dogecoin', 'celestia'
+];
+
+// Symbol to CoinGecko ID mapping for our tracked coins
+const SYMBOL_TO_ID: Record<string, string> = {
+    'btc': 'bitcoin',
+    'eth': 'ethereum',
+    'sol': 'solana',
+    'bnb': 'binancecoin',
+    'avax': 'avalanche-2',
+    'sui': 'sui',
+    'apt': 'aptos',
+    'hype': 'hyperliquid',
+    'link': 'chainlink',
+    'aave': 'aave',
+    'uni': 'uniswap',
+    'xrp': 'ripple',
+    'ltc': 'litecoin',
+    'dot': 'polkadot',
+    'atom': 'cosmos',
+    'matic': 'matic-network',
+    'arb': 'arbitrum',
+    'op': 'optimism',
+    'doge': 'dogecoin',
+    'tia': 'celestia'
+};
+
+// Server-side API route - fetches from CoinGecko (only shows tracked coins)
 export async function GET() {
     try {
+        // Fetch more coins to ensure we get all of ours
         const response = await fetch(
-            'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=20&page=1&sparkline=false&price_change_percentage=24h',
+            'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h',
             {
                 headers: {
                     'Accept': 'application/json',
@@ -19,12 +52,9 @@ export async function GET() {
 
         const data = await response.json();
 
-        // Skip stablecoins
-        const STABLECOINS = ['tether', 'usd-coin', 'dai', 'binance-usd', 'trueusd', 'frax', 'paxos-standard', 'usdd', 'gemini-dollar', 'first-digital-usd'];
-
-        // Map to our format (excluding stablecoins)
+        // Filter to only our tracked coins
         const coins = data
-            .filter((coin: Record<string, unknown>) => !STABLECOINS.includes(coin.id as string))
+            .filter((coin: Record<string, unknown>) => TRACKED_COINS.includes(coin.id as string))
             .map((coin: Record<string, unknown>) => ({
                 id: coin.id,
                 symbol: coin.symbol,
@@ -40,14 +70,14 @@ export async function GET() {
     } catch (error) {
         console.error('Market API error:', error);
 
-        // Return mock data as fallback
+        // Return mock data as fallback (only tracked coins)
         return NextResponse.json({
             coins: [
                 { id: 'bitcoin', symbol: 'btc', name: 'Bitcoin', current_price: 97500, price_change_percentage_24h: 2.5, market_cap: 1920000000000, total_volume: 45000000000, image: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png' },
                 { id: 'ethereum', symbol: 'eth', name: 'Ethereum', current_price: 3250, price_change_percentage_24h: 1.8, market_cap: 390000000000, total_volume: 18000000000, image: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png' },
                 { id: 'solana', symbol: 'sol', name: 'Solana', current_price: 185, price_change_percentage_24h: 4.2, market_cap: 85000000000, total_volume: 5500000000, image: 'https://assets.coingecko.com/coins/images/4128/small/solana.png' },
                 { id: 'ripple', symbol: 'xrp', name: 'XRP', current_price: 2.45, price_change_percentage_24h: -0.8, market_cap: 140000000000, total_volume: 8200000000, image: 'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png' },
-                { id: 'cardano', symbol: 'ada', name: 'Cardano', current_price: 0.92, price_change_percentage_24h: 3.1, market_cap: 32000000000, total_volume: 980000000, image: 'https://assets.coingecko.com/coins/images/975/small/cardano.png' },
+                { id: 'litecoin', symbol: 'ltc', name: 'Litecoin', current_price: 105, price_change_percentage_24h: 1.2, market_cap: 8000000000, total_volume: 450000000, image: 'https://assets.coingecko.com/coins/images/2/small/litecoin.png' },
             ]
         });
     }
