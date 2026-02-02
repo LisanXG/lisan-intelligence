@@ -379,210 +379,154 @@ function ScoreBucketRow({ bucket }: { bucket: ScoreBucketStats }) {
 function CumulativeChart({ returns }: { returns: CumulativeReturn[] }) {
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-    if (returns.length === 0) return null;
+    if (returns.length === 0) {
+        return (
+            <div className="h-64 flex items-center justify-center text-slate-500 bg-slate-900/50 rounded-xl border border-slate-800">
+                No completed trades yet
+            </div>
+        );
+    }
 
-    const maxR = Math.max(...returns.map(r => r.cumulativeR), 1);
-    const minR = Math.min(...returns.map(r => r.cumulativeR), -1);
-    const range = Math.max(maxR - minR, 2);
-    const height = 220;
-    const width = 100;
-    const padding = 2;
+    // Chart dimensions
+    const chartHeight = 280;
 
-    // Calculate Y position for a given R value
-    const getY = (r: number) => {
-        return padding + ((maxR - r) / range) * (height - padding * 2);
-    };
-
-    // Zero line position
-    const zeroY = getY(0);
-
-    // Create smooth path using curve
-    const points = returns.map((r, i) => {
-        const x = (i / Math.max(returns.length - 1, 1)) * width;
-        const y = getY(r.cumulativeR);
-        return { x, y, data: r };
-    });
-
-    // Create SVG path string
-    const pathD = points.length > 0
-        ? `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}`
-        : '';
-
-    // Gradient fill path (to zero line or bottom)
-    const fillPathD = points.length > 0
-        ? `${pathD} L ${width},${zeroY} L 0,${zeroY} Z`
-        : '';
+    // Calculate Y-axis range (minimum ±5R)
+    const dataMax = Math.max(...returns.map(r => r.cumulativeR), 0);
+    const dataMin = Math.min(...returns.map(r => r.cumulativeR), 0);
+    const maxR = Math.max(Math.ceil(dataMax + 1), 5);
+    const minR = Math.min(Math.floor(dataMin - 1), -5);
+    const yRange = maxR - minR;
 
     const finalR = returns[returns.length - 1]?.cumulativeR || 0;
     const isPositive = finalR >= 0;
-    const lineColor = isPositive ? 'rgba(16, 185, 129, 1)' : 'rgba(239, 68, 68, 1)';
-    const gradientId = isPositive ? 'greenGradient' : 'redGradient';
+
+    // SVG coordinate helpers
+    const getX = (index: number) => returns.length === 1 ? 50 : (index / (returns.length - 1)) * 100;
+    const getY = (r: number) => 20 + ((maxR - r) / yRange) * (chartHeight - 60);
+    const zeroY = getY(0);
+
+    // Build points & paths
+    const points = returns.map((r, i) => ({ x: getX(i), y: getY(r.cumulativeR), data: r }));
+    const linePath = points.length > 1 ? `M ${points.map(p => `${p.x},${p.y}`).join(' L ')}` : '';
+    const areaPath = points.length > 1 ? `${linePath} L ${points[points.length - 1].x},${zeroY} L ${points[0].x},${zeroY} Z` : '';
 
     const hoveredPoint = hoveredIndex !== null ? points[hoveredIndex] : null;
 
+    // Y-axis ticks
+    const tickStep = yRange <= 10 ? 2 : 5;
+    const yTicks = [];
+    for (let i = minR; i <= maxR; i += tickStep) yTicks.push(i);
+    if (!yTicks.includes(0)) yTicks.push(0);
+    yTicks.sort((a, b) => b - a);
+
     return (
-        <div className="relative mt-4">
-            {/* Chart Container */}
-            <div
-                className="relative h-56 rounded-xl overflow-hidden"
-                style={{
-                    background: 'linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%)',
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.1)'
-                }}
-            >
-                <svg
-                    viewBox={`0 0 ${width} ${height}`}
-                    preserveAspectRatio="none"
-                    className="w-full h-full"
-                    onMouseLeave={() => setHoveredIndex(null)}
-                >
-                    {/* Gradient Definitions */}
+        <div className="relative">
+            {/* Clean dark container */}
+            <div className="relative rounded-xl overflow-hidden bg-[#0d1117] border border-slate-800" style={{ height: `${chartHeight}px` }}>
+
+                {/* Y-axis labels - left side */}
+                <div className="absolute left-2 top-0 h-full pointer-events-none z-10">
+                    {yTicks.map(tick => (
+                        <div
+                            key={tick}
+                            className={`absolute text-xs font-mono ${tick > 0 ? 'text-green-500' : tick < 0 ? 'text-red-500' : 'text-slate-500'}`}
+                            style={{ top: `${getY(tick)}px`, transform: 'translateY(-50%)' }}
+                        >
+                            {tick > 0 ? '+' : ''}{tick}R
+                        </div>
+                    ))}
+                </div>
+
+                {/* Total PNL badge - top right */}
+                <div className="absolute top-3 right-3 z-10">
+                    <div className={`px-3 py-1.5 rounded-lg font-mono text-lg font-bold ${isPositive ? 'text-green-400 bg-green-500/10 border border-green-500/20' : 'text-red-400 bg-red-500/10 border border-red-500/20'}`}>
+                        {finalR >= 0 ? '+' : ''}{finalR.toFixed(1)}R
+                    </div>
+                </div>
+
+                {/* SVG Chart */}
+                <svg viewBox={`0 0 100 ${chartHeight}`} preserveAspectRatio="none" className="w-full h-full" onMouseLeave={() => setHoveredIndex(null)}>
                     <defs>
-                        <linearGradient id="greenGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" stopColor="rgba(16, 185, 129, 0.4)" />
-                            <stop offset="100%" stopColor="rgba(16, 185, 129, 0)" />
+                        <linearGradient id="greenFill" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor="rgba(34, 197, 94, 0.25)" />
+                            <stop offset="100%" stopColor="rgba(34, 197, 94, 0)" />
                         </linearGradient>
-                        <linearGradient id="redGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" stopColor="rgba(239, 68, 68, 0)" />
-                            <stop offset="100%" stopColor="rgba(239, 68, 68, 0.4)" />
+                        <linearGradient id="redFill" x1="0%" y1="100%" x2="0%" y2="0%">
+                            <stop offset="0%" stopColor="rgba(239, 68, 68, 0.25)" />
+                            <stop offset="100%" stopColor="rgba(239, 68, 68, 0)" />
                         </linearGradient>
-                        <filter id="glow">
-                            <feGaussianBlur stdDeviation="1.5" result="coloredBlur" />
-                            <feMerge>
-                                <feMergeNode in="coloredBlur" />
-                                <feMergeNode in="SourceGraphic" />
-                            </feMerge>
-                        </filter>
                     </defs>
 
-                    {/* Grid lines */}
-                    {[0.25, 0.5, 0.75].map((ratio) => (
-                        <line
-                            key={ratio}
-                            x1="0"
-                            y1={padding + ratio * (height - padding * 2)}
-                            x2={width}
-                            y2={padding + ratio * (height - padding * 2)}
-                            stroke="var(--border-secondary)"
-                            strokeWidth="0.2"
-                            strokeDasharray="1,1"
-                        />
-                    ))}
+                    {/* Zero line */}
+                    <line x1="8" y1={zeroY} x2="100" y2={zeroY} stroke="rgba(255,255,255,0.08)" strokeWidth="0.3" />
 
-                    {/* Zero line (emphasized) */}
-                    <line
-                        x1="0"
-                        y1={zeroY}
-                        x2={width}
-                        y2={zeroY}
-                        stroke="var(--border-primary)"
-                        strokeWidth="0.4"
-                    />
+                    {/* Area fill */}
+                    {points.length > 1 && <path d={areaPath} fill={isPositive ? 'url(#greenFill)' : 'url(#redFill)'} />}
 
-                    {/* Gradient fill under/over curve */}
-                    <path
-                        d={fillPathD}
-                        fill={`url(#${gradientId})`}
-                        opacity="0.8"
-                    />
+                    {/* Main line */}
+                    {points.length > 1 && (
+                        <path d={linePath} fill="none" stroke={isPositive ? '#22c55e' : '#ef4444'} strokeWidth="0.6" strokeLinecap="round" strokeLinejoin="round" />
+                    )}
 
-                    {/* Main performance line with glow */}
-                    <path
-                        d={pathD}
-                        fill="none"
-                        stroke={lineColor}
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        filter="url(#glow)"
-                    />
+                    {/* Single point */}
+                    {points.length === 1 && <circle cx={points[0].x} cy={points[0].y} r="2" fill={points[0].data.outcome === 'WON' ? '#22c55e' : '#ef4444'} />}
 
-                    {/* Data points */}
+                    {/* Hover zones with visible dots */}
                     {points.map((point, i) => (
                         <g key={i}>
-                            {/* Invisible hover target */}
                             <rect
-                                x={point.x - 2}
+                                x={returns.length === 1 ? 0 : point.x - 50 / returns.length}
                                 y={0}
-                                width={4}
-                                height={height}
+                                width={returns.length === 1 ? 100 : 100 / returns.length}
+                                height={chartHeight}
                                 fill="transparent"
                                 onMouseEnter={() => setHoveredIndex(i)}
                                 style={{ cursor: 'crosshair' }}
                             />
-                            {/* Visible dot on hover */}
-                            {hoveredIndex === i && (
-                                <>
-                                    <line
-                                        x1={point.x}
-                                        y1={0}
-                                        x2={point.x}
-                                        y2={height}
-                                        stroke="var(--border-primary)"
-                                        strokeWidth="0.3"
-                                        strokeDasharray="1,1"
-                                    />
-                                    <circle
-                                        cx={point.x}
-                                        cy={point.y}
-                                        r="2"
-                                        fill={point.data.outcome === 'WON' ? 'var(--accent-green)' : 'var(--accent-red)'}
-                                        stroke="var(--bg-primary)"
-                                        strokeWidth="0.5"
-                                    />
-                                </>
+                            {/* Always show small dots */}
+                            {points.length > 1 && (
+                                <circle
+                                    cx={point.x}
+                                    cy={point.y}
+                                    r={hoveredIndex === i ? 1.5 : 0.8}
+                                    fill={point.data.outcome === 'WON' ? '#22c55e' : '#ef4444'}
+                                    opacity={hoveredIndex === i ? 1 : 0.5}
+                                />
                             )}
                         </g>
                     ))}
 
-                    {/* End point glow */}
-                    <circle
-                        cx={width}
-                        cy={getY(finalR)}
-                        r="2.5"
-                        fill={lineColor}
-                        filter="url(#glow)"
-                    />
+                    {/* Hover crosshair */}
+                    {hoveredPoint && (
+                        <line x1={hoveredPoint.x} y1={20} x2={hoveredPoint.x} y2={chartHeight - 40} stroke="rgba(255,255,255,0.2)" strokeWidth="0.15" />
+                    )}
                 </svg>
 
-                {/* Y-axis labels */}
-                <div className="absolute left-2 top-0 h-full flex flex-col justify-between py-2 text-xs text-[var(--text-muted)] pointer-events-none">
-                    <span className={maxR > 0 ? 'text-[var(--accent-green)]' : ''}>{maxR > 0 ? '+' : ''}{maxR.toFixed(0)}R</span>
-                    <span className="opacity-60">0R</span>
-                    <span className={minR < 0 ? 'text-[var(--accent-red)]' : ''}>{minR.toFixed(0)}R</span>
-                </div>
-
-                {/* Tooltip */}
+                {/* Tooltip - anchored at bottom center */}
                 {hoveredPoint && (
-                    <div
-                        className="absolute pointer-events-none z-10 px-3 py-2 rounded-lg text-xs"
-                        style={{
-                            left: `${Math.min(Math.max(hoveredPoint.x, 15), 85)}%`,
-                            top: hoveredPoint.y < height / 2 ? `${(hoveredPoint.y / height) * 100 + 15}%` : `${(hoveredPoint.y / height) * 100 - 20}%`,
-                            transform: 'translateX(-50%)',
-                            background: 'var(--bg-primary)',
-                            border: '1px solid var(--border-primary)',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-                        }}
-                    >
-                        <div className="font-semibold text-[var(--text-primary)]">
-                            Signal #{hoveredPoint.data.signalIndex}: {hoveredPoint.data.coin}
-                        </div>
-                        <div className={`font-medium ${hoveredPoint.data.outcome === 'WON' ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'}`}>
-                            {hoveredPoint.data.outcome === 'WON' ? '✓ Won' : '✗ Lost'} ({hoveredPoint.data.rValue > 0 ? '+' : ''}{hoveredPoint.data.rValue}R)
-                        </div>
-                        <div className="text-[var(--text-muted)]">
-                            Score: {hoveredPoint.data.score} • Total: {hoveredPoint.data.cumulativeR >= 0 ? '+' : ''}{hoveredPoint.data.cumulativeR}R
+                    <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-20">
+                        <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 shadow-xl flex items-center gap-4 text-sm whitespace-nowrap">
+                            <span className="text-white font-medium">{hoveredPoint.data.coin}</span>
+                            <span className={`px-2 py-0.5 rounded text-xs ${hoveredPoint.data.outcome === 'WON' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                {hoveredPoint.data.outcome}
+                            </span>
+                            <span className={`font-mono font-semibold ${hoveredPoint.data.rValue > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {hoveredPoint.data.rValue > 0 ? '+' : ''}{hoveredPoint.data.rValue}R
+                            </span>
+                            <span className="text-slate-500">|</span>
+                            <span className={`font-mono ${hoveredPoint.data.cumulativeR >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                Total: {hoveredPoint.data.cumulativeR >= 0 ? '+' : ''}{hoveredPoint.data.cumulativeR.toFixed(1)}R
+                            </span>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* X-axis label */}
-            <div className="flex justify-between mt-3 text-xs text-[var(--text-muted)]">
-                <span>Signal #1</span>
-                <span className="opacity-60">← Oldest to Newest →</span>
-                <span>Signal #{returns.length}</span>
+            {/* X-axis */}
+            <div className="flex justify-between mt-2 px-1 text-xs text-slate-500">
+                <span>First</span>
+                <span>{returns.length} trade{returns.length !== 1 ? 's' : ''}</span>
+                <span>Latest</span>
             </div>
         </div>
     );
