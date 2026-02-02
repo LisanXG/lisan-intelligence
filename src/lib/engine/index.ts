@@ -1,22 +1,18 @@
 /**
  * LISAN INTELLIGENCE — Signal Engine
  * 
- * Complete self-learning crypto signal engine.
+ * Complete signal engine for crypto analysis.
  * 
  * Modules:
  * - indicators: Technical analysis calculations
  * - risk: Stop loss, take profit, position sizing
  * - scoring: Weighted signal generation (LONG/SHORT/HOLD)
- * - tracking: Signal history and outcome monitoring
- * - learning: Self-adjusting weight optimization
  */
 
 // Core types
 export type { OHLCV, IndicatorResult } from './indicators';
 export type { SignalDirection, RiskLevels, SupportResistance } from './risk';
 export type { SignalOutput, IndicatorWeights } from './scoring';
-export type { SignalRecord, SignalOutcome, ExitReason, TrackingStats } from './tracking';
-export type { WeightAdjustment, LearningCycle, LearningConfig } from './learning';
 
 // Indicators
 export {
@@ -45,24 +41,3 @@ export {
     filterSignals,
     sortSignalsByScore,
 } from './scoring';
-
-// Signal Tracking
-export {
-    getSignalHistory,
-    addSignal,
-    updateSignalOutcome,
-    checkAndUpdateOutcomes,
-    getTrackingStats,
-    shouldTriggerLearning,
-} from './tracking';
-
-// Self-Learning
-export {
-    DEFAULT_LEARNING_CONFIG,
-    getWeightManager,
-    runLearningCycle,
-    checkAndTriggerLearning,
-    getCurrentWeights,
-    getLearningHistory,
-    resetWeightsToDefault,
-} from './learning';

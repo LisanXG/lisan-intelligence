@@ -1,8 +1,8 @@
 /**
  * CRON: Signal Generator
  * 
- * Generates new signals for coins that don't have pending signals.
- * Ensures each user always has ~20 active signals (minus HOLDs).
+ * Generates GLOBAL signals for coins that don't have pending signals.
+ * All users see the same signals (shared engine).
  * 
  * Called every 15 minutes by external cron service.
  */
@@ -10,11 +10,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import {
-    getAllUserIds,
-    getUserPendingSignals,
-    addSignalServer,
-    getUserWeightsServer,
-    getConsecutiveLossesServer,
+    getAllPendingSignals,
+    addGlobalSignal,
+    getGlobalWeights,
+    getConsecutiveLosses,
+    getRecentlyClosedCoins,
 } from '@/lib/supabaseServer';
 import {
     generateSignal,
@@ -141,97 +141,95 @@ export async function GET(request: NextRequest) {
     const startTime = Date.now();
 
     try {
-        // 1. Get all user IDs
-        const userIds = await getAllUserIds();
-        log.debug(`Found ${userIds.length} users`);
+        // 1. Get all pending signals (global)
+        const pending = await getAllPendingSignals();
+        const pendingCoins = new Set(pending.map(p => p.coin.toUpperCase()));
+        log.debug(`Found ${pending.length} pending signals`);
 
-        if (userIds.length === 0) {
+        // 2. Get coins in cooldown period (recently closed)
+        const recentlyClosed = await getRecentlyClosedCoins(4); // 4 hour cooldown
+        log.debug(`Coins in cooldown: ${recentlyClosed.join(', ') || 'none'}`);
+
+        // 3. Find coins without pending signals AND not in cooldown
+        const allCoins = COINS_TO_ANALYZE.map(c => c.symbol);
+        const coinsToGenerate = allCoins.filter(coin =>
+            !pendingCoins.has(coin.toUpperCase()) &&
+            !recentlyClosed.includes(coin.toUpperCase())
+        );
+
+        if (coinsToGenerate.length === 0) {
             return NextResponse.json({
                 success: true,
-                message: 'No users with signals yet',
+                message: 'All coins have pending signals or are in cooldown',
+                pendingCount: pending.length,
+                cooldownCount: recentlyClosed.length,
                 duration: Date.now() - startTime,
             });
         }
 
-        // 2. Fetch Fear & Greed once
+        // 3. Get GLOBAL weights (or use defaults)
+        const weights = await getGlobalWeights();
+        const effectiveWeights = weights
+            ? (weights as unknown as IndicatorWeights)
+            : DEFAULT_WEIGHTS;
+
+        // 4. Fetch Fear & Greed once
         const fearGreed = await fetchFearGreed();
 
-        // 3. For each user, generate signals for coins without pending signals
+        // 5. Generate signals for missing coins
         const generated: { coin: string; direction: string; score: number }[] = [];
-        const allCoins = COINS_TO_ANALYZE.map(c => c.symbol);
 
-        for (const userId of userIds) {
-            // Get existing pending signals
-            const pending = await getUserPendingSignals(userId);
-            const pendingCoins = new Set(pending.map(p => p.coin.toUpperCase()));
+        for (const coin of coinsToGenerate) {
+            const ohlcv = await fetchOHLCV(coin);
 
-            // Find coins without pending signals
-            const coinsToGenerate = allCoins.filter(coin => !pendingCoins.has(coin.toUpperCase()));
-
-            if (coinsToGenerate.length === 0) {
-                log.debug('User has all coins covered');
+            if (ohlcv.length < 50) {
+                log.debug(`Insufficient data for ${coin}`);
                 continue;
             }
 
-            // Get user weights or use defaults
-            const weights = await getUserWeightsServer(userId);
-            const effectiveWeights = weights
-                ? (weights as unknown as IndicatorWeights)
-                : DEFAULT_WEIGHTS;
+            const signal = generateSignal(ohlcv, coin, fearGreed, effectiveWeights);
 
-            // Generate signals for missing coins
-            for (const coin of coinsToGenerate) {
-                const ohlcv = await fetchOHLCV(coin);
+            // Only add if not HOLD
+            if (signal.direction !== 'HOLD') {
+                const confidenceLabel =
+                    signal.score >= 80 ? 'HIGH' :
+                        signal.score >= 60 ? 'MEDIUM' : 'LOW';
 
-                if (ohlcv.length < 50) {
-                    log.debug(`Insufficient data for ${coin}`);
-                    continue;
-                }
+                const added = await addGlobalSignal({
+                    coin: signal.coin,
+                    direction: signal.direction,
+                    score: signal.score,
+                    confidence: confidenceLabel,
+                    entry_price: signal.entryPrice,
+                    stop_loss: signal.stopLoss,
+                    take_profit: signal.takeProfit,
+                    indicator_snapshot: signal.indicators,
+                    weights_used: effectiveWeights as unknown as Record<string, number>,
+                });
 
-                const signal = generateSignal(ohlcv, coin, fearGreed, effectiveWeights);
-
-                // Only add if not HOLD
-                if (signal.direction !== 'HOLD') {
-                    const confidenceLabel =
-                        signal.score >= 80 ? 'HIGH' :
-                            signal.score >= 60 ? 'MEDIUM' : 'LOW';
-
-                    const added = await addSignalServer(userId, {
+                if (added) {
+                    generated.push({
                         coin: signal.coin,
                         direction: signal.direction,
                         score: signal.score,
-                        confidence: confidenceLabel,
-                        entry_price: signal.entryPrice,
-                        stop_loss: signal.stopLoss,
-                        take_profit: signal.takeProfit,
-                        indicator_snapshot: signal.indicators,
-                        weights_used: effectiveWeights as unknown as Record<string, number>,
                     });
-
-                    if (added) {
-                        generated.push({
-                            coin: signal.coin,
-                            direction: signal.direction,
-                            score: signal.score,
-                        });
-                        log.debug(`Added ${signal.coin} ${signal.direction}`);
-                    }
+                    log.debug(`Added ${signal.coin} ${signal.direction}`);
                 }
             }
+        }
 
-            // Check if learning should trigger
-            const consecutiveLosses = await getConsecutiveLossesServer(userId);
-            if (consecutiveLosses >= 3) {
-                log.info(`User has ${consecutiveLosses} consecutive losses - learning needed`);
-                // Learning cycle will be handled by separate endpoint
-            }
+        // 6. Check if learning should trigger (global)
+        const consecutiveLosses = await getConsecutiveLosses();
+        if (consecutiveLosses >= 3) {
+            log.info(`${consecutiveLosses} consecutive losses - learning needed`);
         }
 
         return NextResponse.json({
             success: true,
-            usersProcessed: userIds.length,
+            pendingBefore: pending.length,
             signalsGenerated: generated.length,
             signals: generated,
+            consecutiveLosses,
             duration: Date.now() - startTime,
         });
 
@@ -244,3 +242,4 @@ export async function GET(request: NextRequest) {
         }, { status: 500 });
     }
 }
+

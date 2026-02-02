@@ -11,9 +11,15 @@ export default function AnimatedBackground() {
         if (scriptLoaded && window.UnicornStudio) {
             const us = window.UnicornStudio;
             if (us.init && !us.isInitialized) {
-                us.init();
-                us.isInitialized = true;
-                console.log('[AnimatedBackground] UnicornStudio initialized');
+                try {
+                    us.init();
+                    us.isInitialized = true;
+                    console.log('[AnimatedBackground] UnicornStudio initialized');
+                } catch {
+                    // UnicornStudio may fail on localhost if domain isn't whitelisted
+                    // This is expected - it will work in production
+                    console.debug('[AnimatedBackground] UnicornStudio init skipped (localhost)');
+                }
             }
         }
     }, [scriptLoaded]);

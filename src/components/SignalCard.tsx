@@ -2,7 +2,6 @@
 
 import { SignalOutput } from '@/lib/engine';
 import { useState, useEffect, useCallback } from 'react';
-import { getScoreBucketWinRate } from '@/lib/engine/stats';
 import ShareButton from './ShareButton';
 import { useAuth } from '@/context/auth-context';
 import {
@@ -10,6 +9,13 @@ import {
     addToWatchlist,
     removeFromWatchlist
 } from '@/lib/supabase';
+
+// Simple helper to get score bucket context (placeholder until real stats API)
+function getScoreBucketWinRate(score: number): { winRate: number; sampleSize: number } | null {
+    // Return null as we don't have historical data yet
+    // This will be populated once the proof-stats API has enough data
+    return null;
+}
 
 interface SignalCardProps {
     signal: SignalOutput & { name?: string; image?: string };

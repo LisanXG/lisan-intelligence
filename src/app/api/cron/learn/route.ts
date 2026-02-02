@@ -1,8 +1,8 @@
 /**
  * CRON: Learning Cycle
  * 
- * Analyzes signal performance and adjusts indicator weights
- * when users have consecutive losses.
+ * Analyzes GLOBAL signal performance and adjusts shared weights
+ * when there are consecutive losses.
  * 
  * Called every hour by external cron service.
  */
@@ -10,8 +10,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import {
-    getAllUserIds,
-    getConsecutiveLossesServer,
+    getConsecutiveLosses,
+    getGlobalWeights,
+    updateGlobalWeights,
     supabaseServer,
 } from '@/lib/supabaseServer';
 import { DEFAULT_WEIGHTS, IndicatorWeights } from '@/lib/engine/scoring';
@@ -30,12 +31,6 @@ interface WeightAdjustment {
     reason: string;
 }
 
-interface LearningResult {
-    userId: string;
-    consecutiveLosses: number;
-    adjustments: WeightAdjustment[];
-}
-
 // ============================================================================
 // LEARNING CONFIG
 // ============================================================================
@@ -48,54 +43,16 @@ const LEARNING_CONFIG = {
 };
 
 // ============================================================================
-// SERVER-SIDE LEARNING FUNCTIONS
+// GLOBAL LEARNING FUNCTIONS
 // ============================================================================
 
 /**
- * Get user weights from Supabase, or return defaults
+ * Get recent losing signals (global)
  */
-async function getUserWeights(userId: string): Promise<IndicatorWeights> {
-    const { data, error } = await supabaseServer
-        .from('user_weights')
-        .select('weights')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-    if (error || !data) {
-        return { ...DEFAULT_WEIGHTS };
-    }
-
-    return { ...DEFAULT_WEIGHTS, ...data.weights };
-}
-
-/**
- * Save user weights to Supabase
- */
-async function saveUserWeights(userId: string, weights: IndicatorWeights): Promise<boolean> {
-    const { error } = await supabaseServer
-        .from('user_weights')
-        .upsert({
-            user_id: userId,
-            weights,
-            updated_at: new Date().toISOString(),
-        });
-
-    if (error) {
-        log.error('Failed to save weights', error);
-        return false;
-    }
-
-    return true;
-}
-
-/**
- * Get recent losing signals for analysis
- */
-async function getRecentLosingSignals(userId: string, limit: number = 20) {
+async function getRecentLosingSignals(limit: number = 20) {
     const { data, error } = await supabaseServer
         .from('signals')
         .select('*')
-        .eq('user_id', userId)
         .eq('outcome', 'LOST')
         .order('closed_at', { ascending: false })
         .limit(limit);
@@ -197,23 +154,33 @@ function analyzeLosingSignals(
 }
 
 /**
- * Run learning cycle for a specific user
+ * Run GLOBAL learning cycle
  */
-async function runLearningCycleForUser(userId: string): Promise<LearningResult | null> {
-    const consecutiveLosses = await getConsecutiveLossesServer(userId);
+async function runGlobalLearningCycle(): Promise<{
+    triggered: boolean;
+    consecutiveLosses: number;
+    adjustments: WeightAdjustment[];
+}> {
+    const consecutiveLosses = await getConsecutiveLosses();
 
     if (consecutiveLosses < LEARNING_CONFIG.consecutiveLossThreshold) {
-        return null;
+        return { triggered: false, consecutiveLosses, adjustments: [] };
     }
 
-    const losingSignals = await getRecentLosingSignals(userId, 20);
+    const losingSignals = await getRecentLosingSignals(20);
 
     if (losingSignals.length === 0) {
-        return null;
+        return { triggered: false, consecutiveLosses, adjustments: [] };
     }
 
     const indicatorAnalysis = analyzeLosingSignals(losingSignals);
-    const currentWeights = await getUserWeights(userId);
+
+    // Get current global weights or defaults
+    const storedWeights = await getGlobalWeights();
+    const currentWeights: IndicatorWeights = storedWeights
+        ? { ...DEFAULT_WEIGHTS, ...storedWeights } as IndicatorWeights
+        : { ...DEFAULT_WEIGHTS };
+
     const adjustments: WeightAdjustment[] = [];
 
     for (const [indicator, stats] of indicatorAnalysis.entries()) {
@@ -246,11 +213,12 @@ async function runLearningCycleForUser(userId: string): Promise<LearningResult |
     }
 
     if (adjustments.length > 0) {
-        await saveUserWeights(userId, currentWeights);
+        // Update global weights
+        await updateGlobalWeights(currentWeights as unknown as Record<string, number>);
 
-        // Record learning cycle
+        // Record learning cycle (global, no user_id)
         await supabaseServer.from('learning_cycles').insert({
-            user_id: userId,
+            user_id: null, // Global learning
             triggered_by: 'consecutive_losses',
             signals_analyzed: losingSignals.length,
             adjustments,
@@ -259,7 +227,7 @@ async function runLearningCycleForUser(userId: string): Promise<LearningResult |
     }
 
     return {
-        userId: userId.slice(0, 8), // Partial for logs
+        triggered: true,
         consecutiveLosses,
         adjustments,
     };
@@ -282,32 +250,37 @@ export async function GET(request: NextRequest) {
     const startTime = Date.now();
 
     try {
-        const userIds = await getAllUserIds();
-        log.debug(`Found ${userIds.length} users to check`);
+        log.debug('Running global learning cycle');
 
-        if (userIds.length === 0) {
+        const result = await runGlobalLearningCycle();
+
+        if (!result.triggered) {
             return NextResponse.json({
                 success: true,
-                message: 'No users with signals yet',
+                message: `Only ${result.consecutiveLosses} consecutive losses (need ${LEARNING_CONFIG.consecutiveLossThreshold})`,
+                learningTriggered: false,
                 duration: Date.now() - startTime,
             });
         }
 
-        const results: LearningResult[] = [];
-
-        for (const userId of userIds) {
-            const result = await runLearningCycleForUser(userId);
-            if (result && result.adjustments.length > 0) {
-                results.push(result);
-                log.info(`Learning cycle completed for user with ${result.adjustments.length} adjustments`);
-            }
+        if (result.adjustments.length === 0) {
+            return NextResponse.json({
+                success: true,
+                message: 'Learning triggered but no adjustments needed',
+                learningTriggered: true,
+                consecutiveLosses: result.consecutiveLosses,
+                duration: Date.now() - startTime,
+            });
         }
+
+        log.info(`Learning cycle completed with ${result.adjustments.length} weight adjustments`);
 
         return NextResponse.json({
             success: true,
-            usersChecked: userIds.length,
-            learningCyclesRun: results.length,
-            results,
+            learningTriggered: true,
+            consecutiveLosses: result.consecutiveLosses,
+            adjustmentsCount: result.adjustments.length,
+            adjustments: result.adjustments,
             duration: Date.now() - startTime,
         });
 

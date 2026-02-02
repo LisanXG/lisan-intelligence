@@ -830,10 +830,10 @@ export default function DocsPage() {
                                         Now everything is stored in a PostgreSQL database:
                                     </p>
                                     <ul className="list-disc list-inside space-y-1 text-slate-600 ml-4 mb-3">
-                                        <li><strong>Signals</strong> — Every generated signal with full indicator snapshots</li>
+                                        <li><strong>Signals</strong> — Global signals shared by all users (everyone sees the same engine)</li>
                                         <li><strong>Outcomes</strong> — Win/loss records with exit prices and reasons</li>
-                                        <li><strong>Watchlist</strong> — Your tracked assets with add prices</li>
-                                        <li><strong>Learning Weights</strong> — Personalized indicator weights that adapt to your history</li>
+                                        <li><strong>Watchlist</strong> — Your personal tracked assets (only per-user data)</li>
+                                        <li><strong>Engine Weights</strong> — Global indicator weights that adapt based on platform-wide performance</li>
                                     </ul>
                                 </div>
 
@@ -846,8 +846,8 @@ export default function DocsPage() {
                                         Data isolation is enforced at the database level:
                                     </p>
                                     <ul className="list-disc list-inside space-y-1 text-slate-600 ml-4">
-                                        <li><strong>Row Level Security (RLS)</strong> — You can only access your own data</li>
-                                        <li><strong>No Cross-User Visibility</strong> — Users cannot see each other&apos;s signals or watchlists</li>
+                                        <li><strong>Global Transparency</strong> — All users see the same signals and engine weights</li>
+                                        <li><strong>Per-User Privacy</strong> — Watchlists remain private to each user</li>
                                         <li><strong>Passwords Hashed</strong> — Standard industry practices</li>
                                     </ul>
                                 </div>
@@ -895,7 +895,7 @@ export default function DocsPage() {
 
                     {/* Version */}
                     <div className="mt-8 text-center text-slate-400">
-                        <p>Version 2.0.0 — January 2026 — LISAN HOLDINGS</p>
+                        <p>Version 3.0.0 — February 2026 — Global Engine Architecture — LISAN HOLDINGS</p>
                     </div>
                 </div>
             </main>

@@ -91,18 +91,7 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
                         outcome.reason,
                         outcome.profitPct
                     );
-
-                    // Check if we should trigger learning after this update
-                    const stats = await getTrackingStats(user.id);
-                    if (stats.consecutiveLosses >= 3) {
-                        logger.info('Triggering learning cycle - 3 consecutive losses');
-                        // Run learning cycle (still uses localStorage for now)
-                        import('@/lib/engine/learning').then(({ checkAndTriggerLearning }) => {
-                            checkAndTriggerLearning();
-                        }).catch(() => {
-                            // Learning module not available
-                        });
-                    }
+                    // Learning is now handled by cron/learn endpoint
                 }
             }
 
@@ -112,10 +101,9 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
                 !existingPendingKeys.has(`${s.coin}:${s.direction}`)
             );
 
-            // Import current weights
-            const weights = await import('@/lib/engine/learning').then(
-                m => m.getCurrentWeights()
-            ).catch(() => ({}));
+            // Get global weights from Supabase
+            const { getGlobalWeights } = await import('@/lib/supabase');
+            const weights = (await getGlobalWeights()) || {};
 
             for (const signal of actionableSignals) {
                 const added = await addSignalToDb(user.id, {
@@ -132,11 +120,6 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
 
                 if (added) {
                     logger.debug(`Added ${signal.coin} ${signal.direction} to tracking`);
-
-                    // Subscribe to WebSocket for this coin
-                    import('@/lib/engine/websocket').then(({ getHyperliquidWebSocket }) => {
-                        getHyperliquidWebSocket().subscribe(signal.coin);
-                    });
                 }
             }
 
@@ -214,19 +197,10 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
 
         fetchSignals();
 
-        // Initialize WebSocket for real-time tracking
-        import('@/lib/engine/websocket').then(({ initializeWebSocket }) => {
-            initializeWebSocket();
-        });
-
         // Refresh every 5 minutes
         const interval = setInterval(fetchSignals, 5 * 60 * 1000);
         return () => {
             clearInterval(interval);
-            // Disconnect WebSocket on unmount
-            import('@/lib/engine/websocket').then(({ getHyperliquidWebSocket }) => {
-                getHyperliquidWebSocket().disconnect();
-            });
         };
     }, [trackSignals]);
 

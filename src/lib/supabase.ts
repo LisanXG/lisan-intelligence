@@ -133,13 +133,13 @@ export async function canAddSignal(
 }
 
 /**
- * Get all signals for a user
+ * Get all signals (global, not per-user)
  */
 export async function getUserSignals(userId: string): Promise<DbSignal[]> {
+    // Fetch global signals (not per-user anymore)
     const { data, error } = await supabase
         .from('signals')
         .select('*')
-        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
     if (error) {
@@ -151,13 +151,13 @@ export async function getUserSignals(userId: string): Promise<DbSignal[]> {
 }
 
 /**
- * Get open signals for a user
+ * Get open signals (global, not per-user)
  */
 export async function getOpenSignals(userId: string): Promise<DbSignal[]> {
+    // Fetch global pending signals (not per-user anymore)
     const { data, error } = await supabase
         .from('signals')
         .select('*')
-        .eq('user_id', userId)
         .eq('outcome', 'PENDING')
         .order('created_at', { ascending: false });
 
@@ -194,7 +194,12 @@ export async function addSignalToDb(
         .single();
 
     if (error) {
-        logger.error('Error adding signal', error);
+        // 23505 = duplicate key (constraint working as expected)
+        if (error.code === '23505') {
+            logger.debug(`Signal already exists for ${signal.coin} - skipped`);
+        } else {
+            logger.error('Error adding signal', error);
+        }
         return null;
     }
 
@@ -370,14 +375,22 @@ export async function isInWatchlist(userId: string, coin: string): Promise<boole
 // ============================================================================
 
 export async function getUserWeights(userId: string): Promise<Record<string, number> | null> {
+    // Legacy function - now redirects to global weights
+    return getGlobalWeights();
+}
+
+/**
+ * Get GLOBAL weights (shared by all users)
+ */
+export async function getGlobalWeights(): Promise<Record<string, number> | null> {
     const { data, error } = await supabase
-        .from('user_weights')
+        .from('global_weights')
         .select('weights')
-        .eq('user_id', userId)
+        .eq('id', 1)
         .maybeSingle();
 
     if (error) {
-        logger.error('Error fetching weights', error);
+        logger.error('Error fetching global weights', error);
         return null;
     }
 
@@ -388,20 +401,10 @@ export async function saveUserWeights(
     userId: string,
     weights: Record<string, number>
 ): Promise<boolean> {
-    const { error } = await supabase
-        .from('user_weights')
-        .upsert({
-            user_id: userId,
-            weights,
-            updated_at: new Date().toISOString(),
-        });
-
-    if (error) {
-        logger.error('Error saving weights', error);
-        return false;
-    }
-
-    return true;
+    // Legacy function - weights are now global
+    // This is a no-op on client side; only server can update global weights
+    logger.debug('saveUserWeights is deprecated - weights are now global');
+    return false;
 }
 
 export async function addLearningCycle(
@@ -426,10 +429,10 @@ export async function addLearningCycle(
 }
 
 export async function getLearningHistory(userId: string): Promise<DbLearningCycle[]> {
+    // Fetch global learning history (not per-user anymore)
     const { data, error } = await supabase
         .from('learning_cycles')
         .select('*')
-        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(50);
 
