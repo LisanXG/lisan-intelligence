@@ -6,6 +6,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { logger } from '@/lib/logger';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -59,7 +60,7 @@ export async function getAllPendingSignals(): Promise<DbSignal[]> {
         .eq('outcome', 'PENDING');
 
     if (error) {
-        console.error('[Server] Error fetching pending signals:', error);
+        logger.error('Error fetching pending signals', error);
         return [];
     }
 
@@ -90,7 +91,7 @@ export async function updateSignalOutcomeServer(
         .single();
 
     if (error) {
-        console.error('[Server] Error updating signal:', error);
+        logger.error('Error updating signal', error);
         return null;
     }
 
@@ -107,7 +108,7 @@ export async function getAllUserIds(): Promise<string[]> {
         .limit(1000);
 
     if (error) {
-        console.error('[Server] Error fetching user IDs:', error);
+        logger.error('Error fetching user IDs', error);
         return [];
     }
 
@@ -126,7 +127,7 @@ export async function getUserPendingSignals(userId: string): Promise<DbSignal[]>
         .eq('outcome', 'PENDING');
 
     if (error) {
-        console.error('[Server] Error fetching user pending signals:', error);
+        logger.error('Error fetching user pending signals', error);
         return [];
     }
 
@@ -150,7 +151,7 @@ export async function addSignalServer(
         .maybeSingle();
 
     if (existing) {
-        console.log(`[Server] Blocked duplicate: ${signal.coin} already has pending signal`);
+        logger.debug(`Blocked duplicate: ${signal.coin} already has pending signal`);
         return null;
     }
 
@@ -165,7 +166,7 @@ export async function addSignalServer(
         .single();
 
     if (error) {
-        console.error('[Server] Error adding signal:', error);
+        logger.error('Error adding signal', error);
         return null;
     }
 
@@ -183,7 +184,7 @@ export async function getUserWeightsServer(userId: string): Promise<Record<strin
         .maybeSingle();
 
     if (error) {
-        console.error('[Server] Error fetching weights:', error);
+        logger.error('Error fetching weights', error);
         return null;
     }
 

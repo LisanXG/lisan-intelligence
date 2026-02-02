@@ -12,6 +12,7 @@ import {
     getTrackingStats,
     DbSignal
 } from '@/lib/supabase';
+import { logger } from '@/lib/logger';
 
 interface EngineSignal extends SignalOutput {
     name: string;
@@ -82,7 +83,7 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
                 const outcome = checkOutcome(openSignal, currentPrice);
 
                 if (outcome) {
-                    console.log(`[Signal] ${openSignal.coin} ${outcome.outcome} - ${outcome.reason}`);
+                    logger.debug(`${openSignal.coin} ${outcome.outcome} - ${outcome.reason}`);
                     await updateSignalInDb(
                         openSignal.id,
                         outcome.outcome,
@@ -94,7 +95,7 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
                     // Check if we should trigger learning after this update
                     const stats = await getTrackingStats(user.id);
                     if (stats.consecutiveLosses >= 3) {
-                        console.log('[Learning] Triggering learning cycle - 3 consecutive losses detected');
+                        logger.info('Triggering learning cycle - 3 consecutive losses');
                         // Run learning cycle (still uses localStorage for now)
                         import('@/lib/engine/learning').then(({ checkAndTriggerLearning }) => {
                             checkAndTriggerLearning();
@@ -130,7 +131,7 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
                 });
 
                 if (added) {
-                    console.log(`[Signal] Added ${signal.coin} ${signal.direction} to tracking`);
+                    logger.debug(`Added ${signal.coin} ${signal.direction} to tracking`);
 
                     // Subscribe to WebSocket for this coin
                     import('@/lib/engine/websocket').then(({ getHyperliquidWebSocket }) => {

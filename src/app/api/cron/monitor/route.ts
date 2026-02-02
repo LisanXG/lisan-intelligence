@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 import {
     getAllPendingSignals,
     updateSignalOutcomeServer,
@@ -98,16 +99,18 @@ export async function GET(request: NextRequest) {
     const secret = request.nextUrl.searchParams.get('secret');
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && secret !== cronSecret) {
+    // SECURITY: Fail-closed - reject if secret missing or doesn't match
+    if (!cronSecret || secret !== cronSecret) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const log = logger.withContext('CronMonitor');
     const startTime = Date.now();
 
     try {
         // 1. Get all pending signals
         const pendingSignals = await getAllPendingSignals();
-        console.log(`[Cron Monitor] Found ${pendingSignals.length} pending signals`);
+        log.debug(`Found ${pendingSignals.length} pending signals`);
 
         if (pendingSignals.length === 0) {
             return NextResponse.json({
@@ -120,7 +123,7 @@ export async function GET(request: NextRequest) {
 
         // 2. Fetch current prices
         const prices = await fetchCurrentPrices();
-        console.log(`[Cron Monitor] Fetched prices for ${prices.size} assets`);
+        log.debug(`Fetched prices for ${prices.size} assets`);
 
         // 3. Check each signal
         const updates: { id: string; coin: string; outcome: string; profitPct: number }[] = [];
@@ -129,7 +132,7 @@ export async function GET(request: NextRequest) {
             const currentPrice = prices.get(signal.coin.toUpperCase());
 
             if (!currentPrice) {
-                console.log(`[Cron Monitor] No price for ${signal.coin}, skipping`);
+                log.debug(`No price for ${signal.coin}, skipping`);
                 continue;
             }
 
@@ -151,7 +154,7 @@ export async function GET(request: NextRequest) {
                         outcome: result.outcome,
                         profitPct: Math.round(result.profitPct * 100) / 100,
                     });
-                    console.log(`[Cron Monitor] Updated ${signal.coin}: ${result.outcome} (${result.profitPct.toFixed(2)}%)`);
+                    log.debug(`Updated ${signal.coin}: ${result.outcome} (${result.profitPct.toFixed(2)}%)`);
                 }
             }
         }
@@ -164,7 +167,7 @@ export async function GET(request: NextRequest) {
         });
 
     } catch (error) {
-        console.error('[Cron Monitor] Error:', error);
+        log.error('Monitor error', error);
         return NextResponse.json({
             success: false,
             error: 'Internal server error',

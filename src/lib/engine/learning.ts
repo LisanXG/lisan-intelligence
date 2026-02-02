@@ -7,6 +7,7 @@
 
 import { DEFAULT_WEIGHTS, IndicatorWeights } from './scoring';
 import { getSignalHistory, SignalRecord } from './tracking';
+import { logger } from '@/lib/logger';
 
 // ============================================================================
 // TYPES
@@ -74,13 +75,13 @@ class WeightManager {
             const version = storedVersion ? parseInt(storedVersion, 10) : 1;
 
             if (version < this.currentVersion) {
-                console.log('[Learning] Upgrading from v' + version + ' to v' + this.currentVersion + ' - resetting weights and history');
+                logger.debug(`Upgrading learning from v${version} to v${this.currentVersion}`);
                 localStorage.removeItem(this.storageKey);
                 localStorage.removeItem(this.historyKey);
                 localStorage.setItem(this.versionKey, this.currentVersion.toString());
             }
         } catch (e) {
-            console.error('Failed to check learning version:', e);
+            logger.error('Failed to check learning version', e);
         }
     }
 
@@ -101,7 +102,7 @@ class WeightManager {
                 }));
             }
         } catch (e) {
-            console.error('Failed to load weights:', e);
+            logger.error('Failed to load weights', e);
         }
     }
 
@@ -112,7 +113,7 @@ class WeightManager {
             localStorage.setItem(this.storageKey, JSON.stringify(this.weights));
             localStorage.setItem(this.historyKey, JSON.stringify(this.history));
         } catch (e) {
-            console.error('Failed to save weights:', e);
+            logger.error('Failed to save weights', e);
         }
     }
 

@@ -610,7 +610,7 @@ export default function DocsPage() {
                             </div>
                         </Accordion>
 
-                        <Accordion title="Real-Time Signal Tracking">
+                        <Accordion title="Signal Tracking — 24/7 Monitoring">
                             <p className="mb-6">
                                 When a signal is generated, the system needs to know when it hits its stop loss or take profit.
                                 This is harder than it sounds.
@@ -623,17 +623,26 @@ export default function DocsPage() {
                             </p>
 
                             <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-6 mb-6">
-                                <p className="font-semibold text-cyan-800 mb-2">Hyperliquid WebSocket Integration</p>
+                                <p className="font-semibold text-cyan-800 mb-2">Server-Side Cron Monitoring</p>
                                 <p className="text-slate-600">
-                                    The Lisan Core Engine uses <strong>real-time WebSocket feeds from Hyperliquid</strong> to solve this.
-                                    Every minute, we receive candle data with the high and low for that minute.
-                                    If the high touched your take profit, you won. If the low touched your stop loss, you lost.
-                                    No gaps. No missed exits.
+                                    The Lisan Core Engine uses <strong>server-side cron jobs</strong> that run every 5 minutes,
+                                    24/7, to monitor all open signals. The monitoring process fetches high/low candle data from
+                                    Hyperliquid and checks if any signal&apos;s take profit or stop loss was touched.
+                                    This works even when you&apos;re offline — the engine never sleeps.
+                                </p>
+                            </div>
+
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 mb-6">
+                                <p className="font-semibold text-slate-700 mb-2">Automatic Signal Generation</p>
+                                <p className="text-slate-600">
+                                    When signals close, the engine automatically generates new signals to maintain approximately
+                                    20 active positions (excluding HOLD signals). A separate learning cycle analyzes losing signals
+                                    and adjusts indicator weights hourly.
                                 </p>
                             </div>
 
                             <p className="text-slate-500">
-                                This is the same data infrastructure professional traders use.
+                                This is institutional-grade infrastructure — continuous monitoring with adaptive learning.
                                 The difference is, you don&apos;t have to build it yourself.
                             </p>
                         </Accordion>
@@ -737,16 +746,16 @@ export default function DocsPage() {
                                         Transparency Dashboard (/proof)
                                     </h4>
                                     <p className="text-slate-600 mb-3">
-                                        Every signal we&apos;ve ever generated is tracked and verified. The <a href="/proof" className="text-cyan-600 hover:underline">/proof page</a> shows:
+                                        Every signal we&apos;ve ever generated is tracked and verified in Supabase. The <a href="/proof" className="text-cyan-600 hover:underline">/proof page</a> shows:
                                     </p>
                                     <ul className="list-disc list-inside space-y-1 text-slate-600 ml-4 mb-3">
                                         <li><strong>Win rates by score bucket</strong> — Do higher scores actually perform better?</li>
-                                        <li><strong>Cumulative returns</strong> — How much R (risk units) has the system generated?</li>
-                                        <li><strong>Recent outcomes</strong> — The last 15 completed signals with full entry/exit details</li>
-                                        <li><strong>Known failure modes</strong> — Where the system historically underperforms</li>
+                                        <li><strong>Cumulative performance chart</strong> — Interactive visualization of R values over time</li>
+                                        <li><strong>Recent outcomes</strong> — The last 20 completed signals with full entry/exit details</li>
+                                        <li><strong>Overall statistics</strong> — Total signals, win rate, and cumulative R</li>
                                     </ul>
                                     <p className="text-slate-500 text-sm">
-                                        No cherry-picking. No hiding losses. If the system is bad, you&apos;ll see it here.
+                                        No cherry-picking. No hiding losses. All data comes directly from Supabase — the single source of truth.
                                     </p>
                                 </div>
 

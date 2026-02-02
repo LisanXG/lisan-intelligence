@@ -3,7 +3,6 @@ import {
     generateSignal,
     OHLCV,
     SignalOutput,
-    getCurrentWeights,
     DEFAULT_WEIGHTS
 } from '@/lib/engine';
 
@@ -227,8 +226,8 @@ export async function GET() {
             fetchHyperliquidData(),
         ]);
 
-        // Get current engine weights
-        const weights = typeof window !== 'undefined' ? getCurrentWeights() : DEFAULT_WEIGHTS;
+        // Get current engine weights (server-side uses defaults; user weights from Supabase in cron routes)
+        const weights = DEFAULT_WEIGHTS;
 
         // Fetch OHLCV data for each coin in parallel
         const ohlcvPromises = COINS_TO_ANALYZE.map(async coin => {

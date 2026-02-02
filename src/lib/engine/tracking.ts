@@ -7,6 +7,7 @@
 
 import { SignalOutput } from './scoring';
 import { SignalDirection } from './risk';
+import { logger } from '@/lib/logger';
 
 // ============================================================================
 // TYPES
@@ -78,12 +79,12 @@ class SignalHistory {
             const version = storedVersion ? parseInt(storedVersion, 10) : 1;
 
             if (version < this.currentVersion) {
-                console.log('[Tracking] Upgrading from v' + version + ' to v' + this.currentVersion + ' - clearing old data');
+                logger.debug(`Upgrading tracking from v${version} to v${this.currentVersion}`);
                 localStorage.removeItem(this.storageKey);
                 localStorage.setItem(this.versionKey, this.currentVersion.toString());
             }
         } catch (e) {
-            console.error('Failed to check tracking version:', e);
+            logger.error('Failed to check tracking version', e);
         }
     }
 

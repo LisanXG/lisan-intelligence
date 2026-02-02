@@ -6,6 +6,7 @@
  */
 
 import { createBrowserClient } from '@supabase/ssr';
+import { logger } from '@/lib/logger';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -124,7 +125,7 @@ export async function canAddSignal(
         .maybeSingle();
 
     if (error) {
-        console.error('[Supabase] Error checking existing signal:', error);
+        logger.error('Error checking existing signal', error);
         return false; // Fail safe - don't add if we can't check
     }
 
@@ -142,7 +143,7 @@ export async function getUserSignals(userId: string): Promise<DbSignal[]> {
         .order('created_at', { ascending: false });
 
     if (error) {
-        console.error('[Supabase] Error fetching signals:', error);
+        logger.error('Error fetching signals', error);
         return [];
     }
 
@@ -161,7 +162,7 @@ export async function getOpenSignals(userId: string): Promise<DbSignal[]> {
         .order('created_at', { ascending: false });
 
     if (error) {
-        console.error('[Supabase] Error fetching open signals:', error);
+        logger.error('Error fetching open signals', error);
         return [];
     }
 
@@ -178,7 +179,7 @@ export async function addSignalToDb(
     // First check if we can add
     const canAdd = await canAddSignal(userId, signal.coin, signal.direction);
     if (!canAdd) {
-        console.log(`[Supabase] Blocked duplicate signal: ${signal.coin} ${signal.direction}`);
+        logger.debug(`Blocked duplicate signal: ${signal.coin} ${signal.direction}`);
         return null;
     }
 
@@ -193,7 +194,7 @@ export async function addSignalToDb(
         .single();
 
     if (error) {
-        console.error('[Supabase] Error adding signal:', error);
+        logger.error('Error adding signal', error);
         return null;
     }
 
@@ -224,7 +225,7 @@ export async function updateSignalOutcome(
         .single();
 
     if (error) {
-        console.error('[Supabase] Error updating signal:', error);
+        logger.error('Error updating signal', error);
         return null;
     }
 
@@ -303,7 +304,7 @@ export async function getWatchlist(userId: string): Promise<DbWatchlistItem[]> {
         .order('added_at', { ascending: false });
 
     if (error) {
-        console.error('[Supabase] Error fetching watchlist:', error);
+        logger.error('Error fetching watchlist', error);
         return [];
     }
 
@@ -328,10 +329,10 @@ export async function addToWatchlist(
     if (error) {
         // Might be duplicate - that's okay
         if (error.code === '23505') {
-            console.log('[Supabase] Coin already in watchlist:', coin);
+            logger.debug(`Coin already in watchlist: ${coin}`);
             return null;
         }
-        console.error('[Supabase] Error adding to watchlist:', error);
+        logger.error('Error adding to watchlist', error);
         return null;
     }
 
@@ -346,7 +347,7 @@ export async function removeFromWatchlist(userId: string, coin: string): Promise
         .eq('coin', coin);
 
     if (error) {
-        console.error('[Supabase] Error removing from watchlist:', error);
+        logger.error('Error removing from watchlist', error);
         return false;
     }
 
@@ -376,7 +377,7 @@ export async function getUserWeights(userId: string): Promise<Record<string, num
         .maybeSingle();
 
     if (error) {
-        console.error('[Supabase] Error fetching weights:', error);
+        logger.error('Error fetching weights', error);
         return null;
     }
 
@@ -396,7 +397,7 @@ export async function saveUserWeights(
         });
 
     if (error) {
-        console.error('[Supabase] Error saving weights:', error);
+        logger.error('Error saving weights', error);
         return false;
     }
 
@@ -417,7 +418,7 @@ export async function addLearningCycle(
         .single();
 
     if (error) {
-        console.error('[Supabase] Error adding learning cycle:', error);
+        logger.error('Error adding learning cycle', error);
         return null;
     }
 
@@ -433,7 +434,7 @@ export async function getLearningHistory(userId: string): Promise<DbLearningCycl
         .limit(50);
 
     if (error) {
-        console.error('[Supabase] Error fetching learning history:', error);
+        logger.error('Error fetching learning history', error);
         return [];
     }
 

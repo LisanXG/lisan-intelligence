@@ -2,10 +2,17 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Header from '@/components/Header';
-import { getCurrentWeights, getLearningHistory, resetWeightsToDefault, LearningCycle } from '@/lib/engine/learning';
 import { IndicatorWeights, DEFAULT_WEIGHTS } from '@/lib/engine/scoring';
 import { useAuth } from '@/context/auth-context';
-import { getUserSignals, getTrackingStats, DbSignal } from '@/lib/supabase';
+import {
+    getUserSignals,
+    getTrackingStats,
+    DbSignal,
+    getUserWeights,
+    saveUserWeights,
+    getLearningHistory as getLearningHistoryFromDb,
+    DbLearningCycle
+} from '@/lib/supabase';
 import { supabase } from '@/lib/supabase';
 
 interface TrackingStats {
@@ -16,6 +23,22 @@ interface TrackingStats {
     winRate: number;
     avgProfit: number;
     avgLoss: number;
+    consecutiveLosses: number;
+}
+
+// Transform database learning cycle to display format
+interface LearningCycle {
+    id: string;
+    timestamp: Date;
+    triggeredBy: string;
+    signalsAnalyzed: number;
+    adjustments: Array<{
+        indicator: string;
+        oldWeight: number;
+        newWeight: number;
+        changePercent: number;
+        reason?: string;
+    }>;
     consecutiveLosses: number;
 }
 
@@ -31,12 +54,26 @@ export default function LearningPage() {
         if (!user) return;
 
         try {
-            const [userSignals, userStats] = await Promise.all([
+            const [userSignals, userStats, userWeights, learningHistory] = await Promise.all([
                 getUserSignals(user.id),
-                getTrackingStats(user.id)
+                getTrackingStats(user.id),
+                getUserWeights(user.id),
+                getLearningHistoryFromDb(user.id)
             ]);
             setSignals(userSignals);
             setStats(userStats);
+            if (userWeights) {
+                setWeights({ ...DEFAULT_WEIGHTS, ...userWeights } as IndicatorWeights);
+            }
+            // Transform DB learning cycles to display format
+            setHistory(learningHistory.map((cycle: DbLearningCycle) => ({
+                id: cycle.id,
+                timestamp: new Date(cycle.created_at),
+                triggeredBy: cycle.triggered_by,
+                signalsAnalyzed: cycle.signals_analyzed,
+                adjustments: cycle.adjustments || [],
+                consecutiveLosses: cycle.consecutive_losses || 0
+            })));
         } catch (error) {
             console.error('Failed to load learning data:', error);
         }
@@ -44,8 +81,6 @@ export default function LearningPage() {
 
     useEffect(() => {
         setMounted(true);
-        setWeights(getCurrentWeights());
-        setHistory(getLearningHistory());
     }, []);
 
     useEffect(() => {
@@ -54,11 +89,12 @@ export default function LearningPage() {
         }
     }, [mounted, user, loadData]);
 
-    const handleReset = () => {
+    const handleReset = async () => {
+        if (!user) return;
         if (confirm('Reset all weights to defaults? This cannot be undone.')) {
-            resetWeightsToDefault();
-            setWeights(getCurrentWeights());
-            setHistory(getLearningHistory());
+            await saveUserWeights(user.id, DEFAULT_WEIGHTS as unknown as Record<string, number>);
+            setWeights(DEFAULT_WEIGHTS);
+            loadData(); // Refresh all data
         }
     };
 

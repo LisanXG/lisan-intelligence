@@ -7,7 +7,9 @@
  */
 
 import { getSignalHistory } from './tracking';
+import { logger } from '@/lib/logger';
 
+const log = logger.withContext('WS');
 // Hyperliquid WebSocket endpoint
 const WS_URL = 'wss://api.hyperliquid.xyz/ws';
 
@@ -47,16 +49,16 @@ class HyperliquidWebSocket {
      */
     connect(): void {
         if (this.ws && this.isConnected) {
-            console.log('[WS] Already connected');
+            log.debug('Already connected');
             return;
         }
 
         try {
-            console.log('[WS] Connecting to Hyperliquid...');
+            log.debug('Connecting to Hyperliquid...');
             this.ws = new WebSocket(WS_URL);
 
             this.ws.onopen = () => {
-                console.log('[WS] ✓ Connected to Hyperliquid');
+                log.info('Connected to Hyperliquid');
                 this.isConnected = true;
                 this.reconnectAttempts = 0;
                 this.updateStatus('connected');
@@ -75,17 +77,17 @@ class HyperliquidWebSocket {
                     const message: WsMessage = JSON.parse(event.data);
                     this.handleMessage(message);
                 } catch (e) {
-                    console.error('[WS] Failed to parse message:', e);
+                    log.error('Failed to parse message', e);
                 }
             };
 
             this.ws.onerror = (error) => {
-                console.error('[WS] Error:', error);
+                log.error('WebSocket error', error);
                 this.updateStatus('error');
             };
 
             this.ws.onclose = () => {
-                console.log('[WS] Connection closed');
+                log.debug('Connection closed');
                 this.isConnected = false;
                 this.updateStatus('disconnected');
                 this.stopHeartbeat();
@@ -93,7 +95,7 @@ class HyperliquidWebSocket {
             };
 
         } catch (error) {
-            console.error('[WS] Failed to connect:', error);
+            log.error('Failed to connect', error);
             this.attemptReconnect();
         }
     }
@@ -109,7 +111,7 @@ class HyperliquidWebSocket {
         }
         this.isConnected = false;
         this.updateStatus('disconnected');
-        console.log('[WS] Disconnected');
+        log.debug('Disconnected');
     }
 
     /**
@@ -124,7 +126,7 @@ class HyperliquidWebSocket {
         }
 
         this.subscriptions.add(normalizedCoin);
-        console.log(`[WS] Subscribing to ${normalizedCoin} candles`);
+        log.debug(`Subscribing to ${normalizedCoin} candles`);
 
         if (this.isConnected && this.ws) {
             this.sendSubscription(normalizedCoin);
@@ -142,7 +144,7 @@ class HyperliquidWebSocket {
         }
 
         this.subscriptions.delete(normalizedCoin);
-        console.log(`[WS] Unsubscribing from ${normalizedCoin}`);
+        log.debug(`Unsubscribing from ${normalizedCoin}`);
 
         if (this.isConnected && this.ws) {
             const message = {
@@ -245,7 +247,7 @@ class HyperliquidWebSocket {
             }
 
             if (shouldClose && outcome && exitReason && exitPrice !== null) {
-                console.log(`[WS] Signal ${record.id} hit ${exitReason} at ${exitPrice}`);
+                log.debug(`Signal ${record.id} hit ${exitReason} at ${exitPrice}`);
 
                 // Update the signal outcome
                 history.updateOutcome(record.id, outcome, exitPrice, exitReason);
@@ -263,7 +265,7 @@ class HyperliquidWebSocket {
 
     private attemptReconnect(): void {
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.error('[WS] Max reconnection attempts reached');
+            log.error('Max reconnection attempts reached');
             this.updateStatus('failed');
             return;
         }
@@ -271,7 +273,7 @@ class HyperliquidWebSocket {
         this.reconnectAttempts++;
         const delay = this.reconnectDelay * this.reconnectAttempts;
 
-        console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+        log.debug(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
 
         setTimeout(() => {
             this.connect();

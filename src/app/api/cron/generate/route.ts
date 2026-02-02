@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
 import {
     getAllUserIds,
     getUserPendingSignals,
@@ -132,16 +133,17 @@ export async function GET(request: NextRequest) {
     const secret = request.nextUrl.searchParams.get('secret');
     const cronSecret = process.env.CRON_SECRET;
 
-    if (cronSecret && secret !== cronSecret) {
+    // SECURITY: Fail-closed - reject if secret missing or doesn't match
+    if (!cronSecret || secret !== cronSecret) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
+    const log = logger.withContext('CronGenerate');
     const startTime = Date.now();
 
     try {
         // 1. Get all user IDs
         const userIds = await getAllUserIds();
-        console.log(`[Cron Generate] Found ${userIds.length} users`);
+        log.debug(`Found ${userIds.length} users`);
 
         if (userIds.length === 0) {
             return NextResponse.json({
@@ -155,7 +157,7 @@ export async function GET(request: NextRequest) {
         const fearGreed = await fetchFearGreed();
 
         // 3. For each user, generate signals for coins without pending signals
-        const generated: { userId: string; coin: string; direction: string; score: number }[] = [];
+        const generated: { coin: string; direction: string; score: number }[] = [];
         const allCoins = COINS_TO_ANALYZE.map(c => c.symbol);
 
         for (const userId of userIds) {
@@ -167,7 +169,7 @@ export async function GET(request: NextRequest) {
             const coinsToGenerate = allCoins.filter(coin => !pendingCoins.has(coin.toUpperCase()));
 
             if (coinsToGenerate.length === 0) {
-                console.log(`[Cron Generate] User ${userId.slice(0, 8)} has all coins covered`);
+                log.debug('User has all coins covered');
                 continue;
             }
 
@@ -182,7 +184,7 @@ export async function GET(request: NextRequest) {
                 const ohlcv = await fetchOHLCV(coin);
 
                 if (ohlcv.length < 50) {
-                    console.log(`[Cron Generate] Insufficient data for ${coin}`);
+                    log.debug(`Insufficient data for ${coin}`);
                     continue;
                 }
 
@@ -208,12 +210,11 @@ export async function GET(request: NextRequest) {
 
                     if (added) {
                         generated.push({
-                            userId: userId.slice(0, 8),
                             coin: signal.coin,
                             direction: signal.direction,
                             score: signal.score,
                         });
-                        console.log(`[Cron Generate] Added ${signal.coin} ${signal.direction} for user ${userId.slice(0, 8)}`);
+                        log.debug(`Added ${signal.coin} ${signal.direction}`);
                     }
                 }
             }
@@ -221,7 +222,7 @@ export async function GET(request: NextRequest) {
             // Check if learning should trigger
             const consecutiveLosses = await getConsecutiveLossesServer(userId);
             if (consecutiveLosses >= 3) {
-                console.log(`[Cron Generate] User ${userId.slice(0, 8)} has ${consecutiveLosses} consecutive losses - learning needed`);
+                log.info(`User has ${consecutiveLosses} consecutive losses - learning needed`);
                 // Learning cycle will be handled by separate endpoint
             }
         }
@@ -235,7 +236,7 @@ export async function GET(request: NextRequest) {
         });
 
     } catch (error) {
-        console.error('[Cron Generate] Error:', error);
+        log.error('Generate error', error);
         return NextResponse.json({
             success: false,
             error: 'Internal server error',

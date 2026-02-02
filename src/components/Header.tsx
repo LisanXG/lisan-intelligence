@@ -46,7 +46,7 @@ export default function Header() {
 
                 {/* Mobile: Hamburger Button */}
                 <button
-                    className="lg:hidden flex flex-col gap-1.5 p-2"
+                    className="xl:hidden flex flex-col gap-1.5 p-2"
                     onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                     aria-label="Toggle menu"
                 >
@@ -56,14 +56,14 @@ export default function Header() {
                 </button>
 
                 {/* Center: Navigation (Desktop) */}
-                <nav className="hidden lg:flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
+                <nav className="hidden xl:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
                     {navLinks.map((link) => {
                         const isActive = pathname === link.href;
                         return (
                             <Link
                                 key={link.href}
                                 href={link.href}
-                                className={`px-6 py-3 text-base font-semibold rounded-xl transition-all duration-200 ${isActive
+                                className={`px-4 py-2.5 text-sm font-semibold rounded-xl transition-all duration-200 whitespace-nowrap ${isActive
                                     ? 'text-white bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-lg shadow-cyan-500/25'
                                     : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
                                     }`}
@@ -75,28 +75,28 @@ export default function Header() {
                 </nav>
 
                 {/* Right: User + Live Data (Desktop) */}
-                <div className="hidden lg:flex items-center gap-5">
+                <div className="hidden xl:flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
-                        <span className="text-base font-medium text-slate-600">Live</span>
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                        <span className="text-sm font-medium text-slate-600">Live</span>
                     </div>
-                    <span className="text-base text-slate-500">
+                    <span className="text-sm text-slate-500">
                         {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                     </span>
                     {user && (
-                        <div className="flex items-center gap-3">
-                            <span className="text-sm text-slate-500 truncate max-w-32">
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500 truncate max-w-28">
                                 {user.email}
                             </span>
                             <button
                                 onClick={handleSignOut}
-                                className="text-sm font-medium text-slate-500 hover:text-red-500 transition-colors px-3 py-1.5 rounded-lg hover:bg-red-50"
+                                className="text-xs font-medium text-slate-500 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50"
                             >
                                 Sign Out
                             </button>
                         </div>
                     )}
-                    <span className="text-sm text-slate-400 font-mono bg-slate-100/80 px-3 py-1.5 rounded-lg">
+                    <span className="text-xs text-slate-400 font-mono bg-slate-100/80 px-2 py-1 rounded-lg">
                         v0.2.0
                     </span>
                 </div>
@@ -104,7 +104,7 @@ export default function Header() {
 
             {/* Mobile Menu Dropdown */}
             {mobileMenuOpen && (
-                <div className="lg:hidden bg-white/95 backdrop-blur-xl border-t border-slate-200/50 shadow-lg">
+                <div className="xl:hidden bg-white/95 backdrop-blur-xl border-t border-slate-200/50 shadow-lg">
                     <nav className="flex flex-col p-4 gap-2">
                         {navLinks.map((link) => {
                             const isActive = pathname === link.href;
