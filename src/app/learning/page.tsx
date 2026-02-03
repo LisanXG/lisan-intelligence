@@ -251,14 +251,23 @@ export default function LearningPage() {
                                                 {event.consecutiveLosses} consecutive losses
                                             </div>
                                             {event.adjustments.length > 0 && (
-                                                <div className="mt-2 space-y-1">
+                                                <div className="mt-3 space-y-2">
                                                     {event.adjustments.map((adj, i) => (
-                                                        <div key={i} className="text-xs bg-slate-50 rounded px-2 py-1">
-                                                            <span className="font-medium">{adj.indicator}</span>:
-                                                            {adj.oldWeight} → {adj.newWeight}
-                                                            <span className={adj.changePercent < 0 ? 'text-red-600' : 'text-emerald-600'}>
-                                                                {' '}({adj.changePercent > 0 ? '+' : ''}{adj.changePercent.toFixed(0)}%)
-                                                            </span>
+                                                        <div key={i} className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                                                            <div className="flex justify-between items-center mb-1">
+                                                                <span className="font-semibold text-slate-800">{adj.indicator}</span>
+                                                                <span className={`text-sm font-medium ${adj.changePercent < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                                    {adj.changePercent > 0 ? '+' : ''}{adj.changePercent.toFixed(1)}%
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-sm text-slate-600 mb-1">
+                                                                Weight: {adj.oldWeight.toFixed(2)} → {adj.newWeight.toFixed(2)}
+                                                            </div>
+                                                            {adj.reason && (
+                                                                <div className="text-xs text-slate-500 italic">
+                                                                    {adj.reason}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>

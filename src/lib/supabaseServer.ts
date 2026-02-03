@@ -212,28 +212,101 @@ export async function updateGlobalWeights(weights: Record<string, number>): Prom
 }
 
 /**
- * Get consecutive losses (global, not per-user)
+ * Get the ID of the last signal that triggered a learning event
  */
-export async function getConsecutiveLosses(): Promise<number> {
+export async function getLastLearnedSignalId(): Promise<string | null> {
+    const { data, error } = await supabaseServer
+        .from('learning_cycles')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (error || !data) return null;
+
+    // Get the most recent signal closed before or at learning time
+    const { data: signalData } = await supabaseServer
+        .from('signals')
+        .select('id')
+        .neq('outcome', 'PENDING')
+        .lte('closed_at', data.created_at)
+        .order('closed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    return signalData?.id || null;
+}
+
+/**
+ * Find any streak of 3+ consecutive losses that hasn't been processed yet.
+ * Returns the count of the streak and the signal IDs involved.
+ */
+export async function findUnprocessedLossStreak(): Promise<{
+    count: number;
+    signalIds: string[];
+}> {
+    // Get all completed signals ordered by close time
     const { data, error } = await supabaseServer
         .from('signals')
-        .select('outcome')
+        .select('id, outcome, closed_at')
         .neq('outcome', 'PENDING')
-        .order('closed_at', { ascending: false })
-        .limit(20);
+        .order('closed_at', { ascending: true }); // Oldest first
 
-    if (error || !data) return 0;
+    if (error || !data || data.length === 0) {
+        return { count: 0, signalIds: [] };
+    }
 
-    let count = 0;
+    // Get the timestamp of the last learning event
+    const { data: lastLearning } = await supabaseServer
+        .from('learning_cycles')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    const lastLearnedAt = lastLearning?.created_at ? new Date(lastLearning.created_at) : null;
+
+    // Scan for any streak of 3+ losses after the last learning event
+    let currentStreak: { id: string; closedAt: string }[] = [];
+    let foundStreak: { id: string; closedAt: string }[] = [];
+
     for (const signal of data) {
+        // Skip signals that were already processed by a learning event
+        if (lastLearnedAt && new Date(signal.closed_at) <= lastLearnedAt) {
+            continue;
+        }
+
         if (signal.outcome === 'LOST') {
-            count++;
+            currentStreak.push({ id: signal.id, closedAt: signal.closed_at });
+
+            // Found a streak of 3+ losses
+            if (currentStreak.length >= 3 && foundStreak.length === 0) {
+                foundStreak = [...currentStreak];
+            }
         } else {
-            break;
+            // Reset streak on any WIN
+            currentStreak = [];
         }
     }
 
-    return count;
+    // If we found a streak after the last learning, return it
+    if (foundStreak.length >= 3) {
+        return {
+            count: foundStreak.length,
+            signalIds: foundStreak.map(s => s.id),
+        };
+    }
+
+    return { count: 0, signalIds: [] };
+}
+
+/**
+ * Get consecutive losses (global, not per-user)
+ * DEPRECATED: Use findUnprocessedLossStreak() instead for better streak detection
+ */
+export async function getConsecutiveLosses(): Promise<number> {
+    const streak = await findUnprocessedLossStreak();
+    return streak.count;
 }
 
 /**
