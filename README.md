@@ -45,24 +45,6 @@ LISAN INTELLIGENCE is a research tool that analyzes cryptocurrency markets using
 
 ---
 
-## Local Development
-
-```bash
-# Clone the repo
-git clone https://github.com/LisanXG/lisan-intelligence.git
-cd lisan-intelligence
-
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) to see the app.
-
----
-
 ## Documentation
 
 Full technical whitepaper available at [lisanintel.com/docs](https://lisanintel.com/docs)
