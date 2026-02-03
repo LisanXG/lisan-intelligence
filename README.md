@@ -77,4 +77,4 @@ Built by [Lisan](https://lisanholdings.dev) — Navy veteran, former defense con
 
 ## License
 
-MIT
+All rights reserved. This source code is provided for reference only and may not be copied, modified, or distributed without permission.
