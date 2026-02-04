@@ -274,7 +274,7 @@ export default function DocsPage() {
                             </p>
 
                             <div className="grid grid-cols-4 md:grid-cols-5 gap-3 mb-6">
-                                {['BTC', 'ETH', 'SOL', 'BNB', 'AVAX', 'SUI', 'APT', 'HYPE', 'LINK', 'AAVE', 'UNI', 'XRP', 'LTC', 'DOT', 'ATOM', 'MATIC', 'ARB', 'OP', 'DOGE', 'TIA'].map((coin) => (
+                                {['BTC', 'ETH', 'SOL', 'AVAX', 'LINK', 'DOGE', 'XRP', 'ADA', 'DOT', 'MATIC', 'UNI', 'ATOM', 'LTC', 'NEAR', 'ARB', 'OP', 'APT', 'SUI', 'HYPE', 'INJ'].map((coin) => (
                                     <div key={coin} className="py-3 px-4 bg-slate-100 rounded-lg text-center font-semibold text-slate-700">
                                         {coin}
                                     </div>
@@ -560,6 +560,21 @@ export default function DocsPage() {
                                     because you&apos;re nervous, you break the math.
                                 </p>
                             </div>
+
+                            <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4 mt-6">
+                                <p className="font-semibold text-cyan-800 mb-2">Smart Exit Strategy — Momentum Re-Evaluation</p>
+                                <p className="text-cyan-700 mb-3">
+                                    When a trade reaches <strong>+3% profit</strong>, the engine doesn&apos;t exit immediately.
+                                    Instead, it fetches fresh market data and re-evaluates momentum:
+                                </p>
+                                <ul className="list-disc list-inside space-y-1 text-slate-600 ml-4 mb-3">
+                                    <li><strong>Momentum still aligned</strong> — RSI and MACD confirm trend direction → Let it run to full TP</li>
+                                    <li><strong>Momentum fading</strong> — Indicators show reversal signals → Take profit at current level</li>
+                                </ul>
+                                <p className="text-slate-500 text-sm">
+                                    This prevents cutting winners short while still protecting gains when momentum shifts.
+                                </p>
+                            </div>
                         </Accordion>
 
                         <Accordion title="Self-Learning System — Adaptive Weights">
@@ -750,9 +765,9 @@ export default function DocsPage() {
                                     </p>
                                     <ul className="list-disc list-inside space-y-1 text-slate-600 ml-4 mb-3">
                                         <li><strong>Win rates by score bucket</strong> — Do higher scores actually perform better?</li>
-                                        <li><strong>Cumulative performance chart</strong> — Interactive visualization of R values over time</li>
+                                        <li><strong>Cumulative performance chart</strong> — Interactive visualization of percentage returns over time</li>
                                         <li><strong>Recent outcomes</strong> — The last 20 completed signals with full entry/exit details</li>
-                                        <li><strong>Overall statistics</strong> — Total signals, win rate, and cumulative R</li>
+                                        <li><strong>Overall statistics</strong> — Win rate, average win/loss %, and total cumulative return</li>
                                     </ul>
                                     <p className="text-slate-500 text-sm">
                                         No cherry-picking. No hiding losses. All data comes directly from Supabase — the single source of truth.
@@ -865,6 +880,61 @@ export default function DocsPage() {
                             </div>
                         </Accordion>
 
+                        <Accordion title="API Rate Limiting">
+                            <p className="mb-6">
+                                To ensure fair usage and protect against abuse, all public API endpoints are rate limited.
+                                If you exceed the limit, you&apos;ll receive a <code className="bg-slate-100 px-2 py-1 rounded text-red-600">429 Too Many Requests</code> response.
+                            </p>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b-2 border-slate-200">
+                                            <th className="py-4 pr-4 font-bold text-slate-800">Endpoint</th>
+                                            <th className="py-4 pr-4 font-bold text-slate-800">Limit</th>
+                                            <th className="py-4 font-bold text-slate-800">Window</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-slate-600">
+                                        <tr className="border-b border-slate-100">
+                                            <td className="py-4 pr-4 font-mono text-sm">/api/market</td>
+                                            <td className="py-4 pr-4">60 requests</td>
+                                            <td className="py-4">per minute</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-100">
+                                            <td className="py-4 pr-4 font-mono text-sm">/api/hyperliquid</td>
+                                            <td className="py-4 pr-4">60 requests</td>
+                                            <td className="py-4">per minute</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-100">
+                                            <td className="py-4 pr-4 font-mono text-sm">/api/fear-greed</td>
+                                            <td className="py-4 pr-4">30 requests</td>
+                                            <td className="py-4">per minute</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-100">
+                                            <td className="py-4 pr-4 font-mono text-sm">/api/signals</td>
+                                            <td className="py-4 pr-4">30 requests</td>
+                                            <td className="py-4">per minute</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-100">
+                                            <td className="py-4 pr-4 font-mono text-sm">/api/proof-stats</td>
+                                            <td className="py-4 pr-4">20 requests</td>
+                                            <td className="py-4">per minute</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="bg-slate-50 rounded-lg p-4 mt-6">
+                                <p className="font-semibold text-slate-700 mb-2">Normal Usage</p>
+                                <p className="text-slate-600">
+                                    These limits are generous for normal browsing. You&apos;d have to be refreshing aggressively
+                                    or running scripts against the API to hit them. If you do get rate limited,
+                                    just wait 60 seconds.
+                                </p>
+                            </div>
+                        </Accordion>
+
                     </div>
 
                     {/* Disclaimer */}
@@ -895,7 +965,7 @@ export default function DocsPage() {
 
                     {/* Version */}
                     <div className="mt-8 text-center text-slate-400">
-                        <p>Version 3.0.0 — February 2026 — Global Engine Architecture — LISAN HOLDINGS</p>
+                        <p>Version 3.1.0 — February 2026 — Smart Exit Strategy — LISAN HOLDINGS</p>
                     </div>
                 </div>
             </main>

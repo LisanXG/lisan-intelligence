@@ -7,6 +7,10 @@
 
 import { createBrowserClient } from '@supabase/ssr';
 import { logger } from '@/lib/logger';
+import type { DbSignal, DbWatchlistItem, DbUserWeights, DbLearningCycle } from '@/lib/types/database';
+
+// Re-export types for convenience
+export type { DbSignal, DbWatchlistItem, DbUserWeights, DbLearningCycle };
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -46,61 +50,6 @@ export async function getSession() {
 export async function getUser() {
     const { data: { user }, error } = await supabase.auth.getUser();
     return { user, error };
-}
-
-// ============================================================================
-// DATABASE TYPES
-// ============================================================================
-
-export interface DbSignal {
-    id: string;
-    user_id: string;
-    coin: string;
-    direction: 'LONG' | 'SHORT' | 'HOLD';
-    score: number;
-    confidence: string;
-    entry_price: number;
-    stop_loss: number;
-    take_profit: number;
-    outcome: 'PENDING' | 'WON' | 'LOST';
-    exit_price?: number;
-    exit_reason?: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT' | 'MANUAL';
-    profit_pct?: number;
-    indicator_snapshot: Record<string, number>;
-    weights_used: Record<string, number>;
-    created_at: string;
-    closed_at?: string;
-}
-
-export interface DbWatchlistItem {
-    id: string;
-    user_id: string;
-    coin: string;
-    price_at_add: number;
-    added_at: string;
-}
-
-export interface DbUserWeights {
-    user_id: string;
-    weights: Record<string, number>;
-    updated_at: string;
-}
-
-export interface DbLearningCycle {
-    id: string;
-    user_id: string;
-    triggered_by: string;
-    signals_analyzed: number;
-    adjustments: Array<{
-        indicator: string;
-        oldWeight: number;
-        newWeight: number;
-        changePercent: number;
-        reason: string;
-    }>;
-    previous_win_rate?: number;
-    consecutive_losses?: number;
-    created_at: string;
 }
 
 // ============================================================================

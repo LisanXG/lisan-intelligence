@@ -88,10 +88,10 @@ So I curated a list. These are assets with deep liquidity, significant trading v
 
 | Asset | Asset | Asset | Asset | Asset |
 |-------|-------|-------|-------|-------|
-| BTC | ETH | SOL | BNB | AVAX |
-| SUI | APT | HYPE | LINK | AAVE |
-| UNI | XRP | ADA | DOT | ATOM |
-| MATIC | ARB | OP | DOGE | TIA |
+| BTC | ETH | SOL | AVAX | LINK |
+| DOGE | XRP | ADA | DOT | MATIC |
+| UNI | ATOM | LTC | NEAR | ARB |
+| OP | APT | SUI | HYPE | INJ |
 
 **Explicit Exclusions:**
 - **Stablecoins** (USDT, USDC, DAI) — No directional opportunity. They're pegged.
@@ -236,6 +236,15 @@ This ratio means you're risking 1 unit to gain 2 units. At this ratio, you only 
 
 The math is on your side — *if you follow the system*. The moment you move your stop loss, double down on a loser, or take profits early because you're nervous, you break the math.
 
+### Smart Exit Strategy — Momentum Re-Evaluation
+
+When a trade reaches **+3% profit**, the engine doesn't exit immediately. Instead, it fetches fresh market data and re-evaluates momentum:
+
+- **Momentum still aligned** — RSI and MACD confirm trend direction → Let it run to full ATR-based take profit
+- **Momentum fading** — Indicators show reversal signals → Take profit at current level
+
+This prevents cutting winners short while still protecting gains when momentum shifts. The engine makes this decision automatically during the 24/7 monitoring cycle.
+
 ---
 
 ## Self-Learning System — Adaptive Weights
@@ -254,7 +263,7 @@ When the engine generates 3 LONG or SHORT signals in a row that hit their stop l
 
 2. **Reduce their weights** — Problematic indicators have their weights reduced by up to 15% per cycle. This is gradual, not dramatic. We're adjusting, not panic-selling.
 
-3. **Persist the changes** — New weights are saved to localStorage. The system remembers. Next time you load the page, the adjusted weights are active.
+3. **Persist the changes** — New weights are saved to the database (Supabase). The system remembers. Every user sees the adapted weights.
 
 ### Weight Bounds
 
@@ -278,6 +287,22 @@ Transparency matters. Here's exactly where the engine gets its data:
 | Open Interest | Hyperliquid Meta API | 30 seconds |
 
 All API calls happen server-side. Your browser never contacts these APIs directly. This protects rate limits and keeps the architecture clean.
+
+---
+
+## Signal Tracking — 24/7 Monitoring
+
+When a signal is generated, the engine needs to know when it hits its stop loss or take profit. This is harder than it sounds.
+
+A naive approach would be to check the current price every few minutes. But if price spikes to your TP at 2:01 PM and crashes back down by 2:05 PM, you'd never see it.
+
+### Server-Side Cron Monitoring
+
+The Lisan Core Engine uses **server-side cron jobs** that run every 5 minutes, 24/7, to monitor all open signals. The monitoring process fetches prices from Hyperliquid and checks if any signal's take profit or stop loss was touched. This works even when you're offline — the engine never sleeps.
+
+### Automatic Signal Generation
+
+When signals close, the engine automatically generates new signals to maintain approximately 20 active positions (excluding HOLD signals). A separate learning cycle analyzes losing signals and adjusts indicator weights hourly.
 
 ---
 
@@ -308,4 +333,4 @@ Do your own research. Use this as one input among many. And for the love of god,
 
 ---
 
-*Version 1.2.0 — January 2026 — LISAN HOLDINGS*
+*Version 3.1.0 — February 2026 — Smart Exit Strategy — LISAN HOLDINGS*

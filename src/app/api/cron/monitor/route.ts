@@ -56,36 +56,155 @@ async function fetchCurrentPrices(): Promise<Map<string, number>> {
 }
 
 /**
- * Check if a signal hit SL or TP
+ * Fetch recent candles from Binance for momentum check
  */
-function checkSignalOutcome(
+async function fetchRecentCandles(symbol: string, limit: number = 50): Promise<{ closes: number[]; data: { high: number; low: number; close: number; volume: number }[] } | null> {
+    try {
+        const pair = `${symbol.toUpperCase()}USDT`;
+        const response = await fetch(
+            `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=15m&limit=${limit}`
+        );
+
+        if (!response.ok) return null;
+
+        const klines = await response.json() as [number, string, string, string, string, string][];
+        const closes = klines.map(k => parseFloat(k[4]));
+        const data = klines.map(k => ({
+            high: parseFloat(k[2]),
+            low: parseFloat(k[3]),
+            close: parseFloat(k[4]),
+            volume: parseFloat(k[5]),
+        }));
+
+        return { closes, data };
+    } catch (error) {
+        console.error(`[Cron Monitor] Error fetching candles for ${symbol}:`, error);
+        return null;
+    }
+}
+
+/**
+ * Quick momentum check using RSI and MACD
+ * Returns true if momentum is still aligned with trade direction
+ */
+function checkMomentumAligned(closes: number[], direction: 'LONG' | 'SHORT'): { aligned: boolean; reason: string } {
+    if (closes.length < 30) {
+        return { aligned: true, reason: 'Insufficient data, allowing trade to continue' };
+    }
+
+    // Calculate RSI (simplified inline version)
+    const period = 14;
+    const gains: number[] = [];
+    const losses: number[] = [];
+
+    for (let i = 1; i < closes.length; i++) {
+        const change = closes[i] - closes[i - 1];
+        gains.push(change > 0 ? change : 0);
+        losses.push(change < 0 ? Math.abs(change) : 0);
+    }
+
+    const recentGains = gains.slice(-period);
+    const recentLosses = losses.slice(-period);
+    const avgGain = recentGains.reduce((a, b) => a + b, 0) / period;
+    const avgLoss = recentLosses.reduce((a, b) => a + b, 0) / period;
+    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    const rsi = 100 - (100 / (1 + rs));
+
+    // Calculate MACD trend (simplified)
+    const ema12 = closes.slice(-12).reduce((a, b) => a + b, 0) / 12;
+    const ema26 = closes.slice(-26).reduce((a, b) => a + b, 0) / 26;
+    const macdLine = ema12 - ema26;
+    const prevEma12 = closes.slice(-13, -1).reduce((a, b) => a + b, 0) / 12;
+    const prevEma26 = closes.slice(-27, -1).reduce((a, b) => a + b, 0) / 26;
+    const prevMacd = prevEma12 - prevEma26;
+    const macdTrending = macdLine > prevMacd ? 'up' : 'down';
+
+    // Check alignment based on direction
+    if (direction === 'LONG') {
+        // For LONG: momentum fading if RSI dropping from overbought OR MACD turning down
+        const rsiWeakening = rsi < 45;
+        const macdWeakening = macdTrending === 'down' && macdLine < 0;
+
+        if (rsiWeakening && macdWeakening) {
+            return { aligned: false, reason: `RSI=${rsi.toFixed(0)}, MACD trending down - momentum fading` };
+        }
+        return { aligned: true, reason: `RSI=${rsi.toFixed(0)}, MACD ${macdTrending} - momentum intact` };
+    } else {
+        // For SHORT: momentum fading if RSI rising from oversold OR MACD turning up  
+        const rsiWeakening = rsi > 55;
+        const macdWeakening = macdTrending === 'up' && macdLine > 0;
+
+        if (rsiWeakening && macdWeakening) {
+            return { aligned: false, reason: `RSI=${rsi.toFixed(0)}, MACD trending up - momentum fading` };
+        }
+        return { aligned: true, reason: `RSI=${rsi.toFixed(0)}, MACD ${macdTrending} - momentum intact` };
+    }
+}
+
+/**
+ * Check if a signal hit SL or TP
+ * Now with smart momentum re-evaluation at 3% profit
+ */
+async function checkSignalOutcome(
     signal: DbSignal,
     currentPrice: number
-): { hit: boolean; outcome?: 'WON' | 'LOST'; exitReason?: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT'; profitPct?: number } {
-    const { direction, entry_price, stop_loss, take_profit } = signal;
+): Promise<{ hit: boolean; outcome?: 'WON' | 'LOST'; exitReason?: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT' | 'MOMENTUM_EXIT'; profitPct?: number }> {
+    const { direction, entry_price, stop_loss, take_profit, coin } = signal;
     const WIN_THRESHOLD_PCT = 3;
 
     if (direction === 'LONG') {
         const profitPct = ((currentPrice - entry_price) / entry_price) * 100;
 
+        // Hit full TP - always take it
         if (currentPrice >= take_profit) {
             return { hit: true, outcome: 'WON', exitReason: 'TAKE_PROFIT', profitPct };
         }
+
+        // Hit 3% threshold - check momentum before exiting
         if (profitPct >= WIN_THRESHOLD_PCT) {
-            return { hit: true, outcome: 'WON', exitReason: 'TARGET_3_PERCENT', profitPct };
+            const candles = await fetchRecentCandles(coin);
+            if (candles) {
+                const { aligned, reason } = checkMomentumAligned(candles.closes, 'LONG');
+                console.log(`[Monitor] ${coin} LONG at +${profitPct.toFixed(2)}%: ${reason}`);
+
+                if (!aligned) {
+                    // Momentum fading, take profit now
+                    return { hit: true, outcome: 'WON', exitReason: 'MOMENTUM_EXIT', profitPct };
+                }
+                // Momentum still strong, let it run to TP
+            }
+            // If candle fetch failed, fall through to let trade continue
         }
+
+        // Hit SL
         if (currentPrice <= stop_loss) {
             return { hit: true, outcome: 'LOST', exitReason: 'STOP_LOSS', profitPct };
         }
     } else if (direction === 'SHORT') {
         const profitPct = ((entry_price - currentPrice) / entry_price) * 100;
 
+        // Hit full TP - always take it
         if (currentPrice <= take_profit) {
             return { hit: true, outcome: 'WON', exitReason: 'TAKE_PROFIT', profitPct };
         }
+
+        // Hit 3% threshold - check momentum before exiting
         if (profitPct >= WIN_THRESHOLD_PCT) {
-            return { hit: true, outcome: 'WON', exitReason: 'TARGET_3_PERCENT', profitPct };
+            const candles = await fetchRecentCandles(coin);
+            if (candles) {
+                const { aligned, reason } = checkMomentumAligned(candles.closes, 'SHORT');
+                console.log(`[Monitor] ${coin} SHORT at +${profitPct.toFixed(2)}%: ${reason}`);
+
+                if (!aligned) {
+                    // Momentum fading, take profit now
+                    return { hit: true, outcome: 'WON', exitReason: 'MOMENTUM_EXIT', profitPct };
+                }
+                // Momentum still strong, let it run to TP
+            }
+            // If candle fetch failed, fall through to let trade continue
         }
+
+        // Hit SL
         if (currentPrice >= stop_loss) {
             return { hit: true, outcome: 'LOST', exitReason: 'STOP_LOSS', profitPct };
         }
@@ -136,7 +255,7 @@ export async function GET(request: NextRequest) {
                 continue;
             }
 
-            const result = checkSignalOutcome(signal, currentPrice);
+            const result = await checkSignalOutcome(signal, currentPrice);
 
             if (result.hit && result.outcome && result.exitReason && result.profitPct !== undefined) {
                 const updated = await updateSignalOutcomeServer(

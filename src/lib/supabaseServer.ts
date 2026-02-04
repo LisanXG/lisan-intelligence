@@ -7,6 +7,10 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/logger';
+import type { DbSignal } from '@/lib/types/database';
+
+// Re-export for convenience
+export type { DbSignal };
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -21,30 +25,6 @@ export const supabaseServer = createClient(supabaseUrl, serviceRoleKey, {
         persistSession: false,
     },
 });
-
-// ============================================================================
-// TYPES (duplicated from supabase.ts for server isolation)
-// ============================================================================
-
-export interface DbSignal {
-    id: string;
-    user_id: string;
-    coin: string;
-    direction: 'LONG' | 'SHORT' | 'HOLD';
-    score: number;
-    confidence: string;
-    entry_price: number;
-    stop_loss: number;
-    take_profit: number;
-    outcome: 'PENDING' | 'WON' | 'LOST';
-    exit_price?: number;
-    exit_reason?: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT' | 'MANUAL';
-    profit_pct?: number;
-    indicator_snapshot: Record<string, number>;
-    weights_used: Record<string, number>;
-    created_at: string;
-    closed_at?: string;
-}
 
 // ============================================================================
 // SERVER-SIDE HELPERS
@@ -74,7 +54,7 @@ export async function updateSignalOutcomeServer(
     signalId: string,
     outcome: 'WON' | 'LOST',
     exitPrice: number,
-    exitReason: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT',
+    exitReason: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT' | 'MOMENTUM_EXIT',
     profitPct: number
 ): Promise<DbSignal | null> {
     const { data, error } = await supabaseServer
@@ -300,14 +280,6 @@ export async function findUnprocessedLossStreak(): Promise<{
     return { count: 0, signalIds: [] };
 }
 
-/**
- * Get consecutive losses (global, not per-user)
- * DEPRECATED: Use findUnprocessedLossStreak() instead for better streak detection
- */
-export async function getConsecutiveLosses(): Promise<number> {
-    const streak = await findUnprocessedLossStreak();
-    return streak.count;
-}
 
 /**
  * Add a signal (global, no user_id)

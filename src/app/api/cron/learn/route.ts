@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import {
-    getConsecutiveLosses,
+    findUnprocessedLossStreak,
     getGlobalWeights,
     updateGlobalWeights,
     supabaseServer,
@@ -161,7 +161,8 @@ async function runGlobalLearningCycle(): Promise<{
     consecutiveLosses: number;
     adjustments: WeightAdjustment[];
 }> {
-    const consecutiveLosses = await getConsecutiveLosses();
+    const lossStreak = await findUnprocessedLossStreak();
+    const consecutiveLosses = lossStreak.count;
 
     if (consecutiveLosses < LEARNING_CONFIG.consecutiveLossThreshold) {
         return { triggered: false, consecutiveLosses, adjustments: [] };

@@ -3,13 +3,14 @@
 /**
  * Client-side Providers wrapper
  * 
- * Wraps the app with AuthProvider and AuthGate.
+ * Wraps the app with AuthProvider, AuthGate, and ErrorBoundary.
  * Needed because layout.tsx is a server component.
  */
 
 import React from 'react';
 import { AuthProvider } from '@/context/auth-context';
 import AuthGate from '@/components/AuthGate';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 interface ProvidersProps {
     children: React.ReactNode;
@@ -17,10 +18,12 @@ interface ProvidersProps {
 
 export default function Providers({ children }: ProvidersProps) {
     return (
-        <AuthProvider>
-            <AuthGate>
-                {children}
-            </AuthGate>
-        </AuthProvider>
+        <ErrorBoundary>
+            <AuthProvider>
+                <AuthGate>
+                    {children}
+                </AuthGate>
+            </AuthProvider>
+        </ErrorBoundary>
     );
 }

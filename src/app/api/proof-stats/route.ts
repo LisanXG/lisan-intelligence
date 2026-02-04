@@ -44,7 +44,9 @@ interface PerformanceSummary {
     wins: number;
     losses: number;
     overallWinRate: number;
-    totalR: number;
+    avgWinPct: number;       // Average win percentage
+    avgLossPct: number;      // Average loss percentage (positive number)
+    totalPct: number;        // Sum of all trade returns
     isEarlyData: boolean;
     earlyDataThreshold: number;
 }
@@ -52,10 +54,37 @@ interface PerformanceSummary {
 interface CumulativeReturn {
     signalIndex: number;
     coin: string;
+    direction: string;
     score: number;
     outcome: 'WON' | 'LOST';
-    rValue: number;
-    cumulativeR: number;
+    profitPct: number;        // Individual trade return
+    cumulativePct: number;    // Running sum of all returns
+    closedAt: string;
+    entryPrice: number;
+    exitPrice: number;
+    exitReason: string | null;
+    durationHours: number;    // How long the trade was open
+}
+
+interface LearningEvent {
+    occurredAt: string;
+    triggeredBy: string;
+    signalsAnalyzed: number;
+    consecutiveLosses: number;
+    adjustments: { indicator: string; oldWeight: number; newWeight: number; reason: string }[];
+}
+
+interface ExitBreakdown {
+    takeProfit: number;
+    stopLoss: number;
+    momentumExit: number;
+    target3Percent: number;
+}
+
+interface BestWorstTrade {
+    coin: string;
+    direction: string;
+    profitPct: number;
     closedAt: string;
 }
 
@@ -121,31 +150,53 @@ export async function GET() {
                 return aTime - bTime; // Oldest first
             });
 
-        let runningR = 0;
+        // Calculate percentage-based cumulative returns with enhanced data
+        let runningPct = 0;
         const cumulativeReturns: CumulativeReturn[] = completedSignals.map((signal, index) => {
-            // Win = +1R, Loss = -1R (simplified R calculation)
-            const rValue = signal.outcome === 'WON' ? 1 : -1;
-            runningR += rValue;
+            const profitPct = signal.profit_pct || 0;
+            runningPct += profitPct;
+
+            // Calculate duration in hours
+            const createdTime = new Date(signal.created_at).getTime();
+            const closedTime = signal.closed_at ? new Date(signal.closed_at).getTime() : createdTime;
+            const durationHours = Math.round((closedTime - createdTime) / (1000 * 60 * 60) * 10) / 10;
 
             return {
                 signalIndex: index + 1,
                 coin: signal.coin,
+                direction: signal.direction,
                 score: signal.score,
                 outcome: signal.outcome as 'WON' | 'LOST',
-                rValue,
-                cumulativeR: Math.round(runningR * 100) / 100,
+                profitPct: Math.round(profitPct * 100) / 100,
+                cumulativePct: Math.round(runningPct * 100) / 100,
                 closedAt: signal.closed_at || signal.created_at,
+                entryPrice: signal.entry_price,
+                exitPrice: signal.exit_price || signal.entry_price,
+                exitReason: signal.exit_reason,
+                durationHours,
             };
         });
 
-        // Calculate summary
+        // Calculate summary with percentage metrics
         const wins = allSignals.filter(s => s.outcome === 'WON').length;
         const losses = allSignals.filter(s => s.outcome === 'LOST').length;
         const open = allSignals.filter(s => s.outcome === 'PENDING').length;
         const completed = wins + losses;
         const EARLY_DATA_THRESHOLD = 30;
-        const totalR = cumulativeReturns.length > 0
-            ? cumulativeReturns[cumulativeReturns.length - 1].cumulativeR
+
+        // Calculate average win and loss percentages
+        const winSignals = completedSignals.filter(s => s.outcome === 'WON');
+        const lossSignals = completedSignals.filter(s => s.outcome === 'LOST');
+
+        const avgWinPct = winSignals.length > 0
+            ? winSignals.reduce((sum, s) => sum + (s.profit_pct || 0), 0) / winSignals.length
+            : 0;
+        const avgLossPct = lossSignals.length > 0
+            ? Math.abs(lossSignals.reduce((sum, s) => sum + (s.profit_pct || 0), 0) / lossSignals.length)
+            : 0;
+
+        const totalPct = cumulativeReturns.length > 0
+            ? cumulativeReturns[cumulativeReturns.length - 1].cumulativePct
             : 0;
 
         const summary: PerformanceSummary = {
@@ -155,7 +206,9 @@ export async function GET() {
             wins,
             losses,
             overallWinRate: completed > 0 ? Math.round((wins / completed) * 100) : 0,
-            totalR,
+            avgWinPct: Math.round(avgWinPct * 100) / 100,
+            avgLossPct: Math.round(avgLossPct * 100) / 100,
+            totalPct: Math.round(totalPct * 100) / 100,
             isEarlyData: completed < EARLY_DATA_THRESHOLD,
             earlyDataThreshold: EARLY_DATA_THRESHOLD,
         };
@@ -165,11 +218,63 @@ export async function GET() {
             .filter(s => s.outcome !== 'PENDING')
             .slice(0, 20);
 
+        // Fetch learning events
+        const { data: learningData } = await supabaseServer
+            .from('learning_cycles')
+            .select('created_at, triggered_by, signals_analyzed, consecutive_losses, adjustments')
+            .order('created_at', { ascending: true });
+
+        const learningEvents: LearningEvent[] = (learningData || []).map(lc => ({
+            occurredAt: lc.created_at,
+            triggeredBy: lc.triggered_by,
+            signalsAnalyzed: lc.signals_analyzed,
+            consecutiveLosses: lc.consecutive_losses,
+            adjustments: lc.adjustments || [],
+        }));
+
+        // Calculate exit breakdown
+        const exitBreakdown: ExitBreakdown = {
+            takeProfit: completedSignals.filter(s => s.exit_reason === 'TAKE_PROFIT').length,
+            stopLoss: completedSignals.filter(s => s.exit_reason === 'STOP_LOSS').length,
+            momentumExit: completedSignals.filter(s => s.exit_reason === 'MOMENTUM_EXIT').length,
+            target3Percent: completedSignals.filter(s => s.exit_reason === 'TARGET_3_PERCENT').length,
+        };
+
+        // Find best and worst trades
+        const sortedByProfit = completedSignals
+            .filter(s => s.profit_pct !== null)
+            .sort((a, b) => (b.profit_pct || 0) - (a.profit_pct || 0));
+
+        const bestTrade: BestWorstTrade | null = sortedByProfit.length > 0 ? {
+            coin: sortedByProfit[0].coin,
+            direction: sortedByProfit[0].direction,
+            profitPct: Math.round((sortedByProfit[0].profit_pct || 0) * 100) / 100,
+            closedAt: sortedByProfit[0].closed_at || sortedByProfit[0].created_at,
+        } : null;
+
+        const worstTrade: BestWorstTrade | null = sortedByProfit.length > 0 ? {
+            coin: sortedByProfit[sortedByProfit.length - 1].coin,
+            direction: sortedByProfit[sortedByProfit.length - 1].direction,
+            profitPct: Math.round((sortedByProfit[sortedByProfit.length - 1].profit_pct || 0) * 100) / 100,
+            closedAt: sortedByProfit[sortedByProfit.length - 1].closed_at || sortedByProfit[sortedByProfit.length - 1].created_at,
+        } : null;
+
+        // Calculate average duration
+        const totalDuration = cumulativeReturns.reduce((sum, r) => sum + r.durationHours, 0);
+        const avgDurationHours = cumulativeReturns.length > 0
+            ? Math.round(totalDuration / cumulativeReturns.length * 10) / 10
+            : 0;
+
         return NextResponse.json({
             bucketStats,
             summary,
             recentOutcomes,
             cumulativeReturns,
+            learningEvents,
+            exitBreakdown,
+            bestTrade,
+            worstTrade,
+            avgDurationHours,
         });
 
     } catch (error) {

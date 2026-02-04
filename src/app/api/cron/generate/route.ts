@@ -13,7 +13,7 @@ import {
     getAllPendingSignals,
     addGlobalSignal,
     getGlobalWeights,
-    getConsecutiveLosses,
+    findUnprocessedLossStreak,
     getRecentlyClosedCoins,
 } from '@/lib/supabaseServer';
 import {
@@ -22,32 +22,12 @@ import {
     DEFAULT_WEIGHTS,
     IndicatorWeights,
 } from '@/lib/engine';
+import { CURATED_ASSETS } from '@/lib/constants/assets';
 
 const HYPERLIQUID_API = 'https://api.hyperliquid.xyz/info';
 
-// 20 curated coins (same as engine-signals route)
-const COINS_TO_ANALYZE = [
-    { symbol: 'BTC', name: 'Bitcoin' },
-    { symbol: 'ETH', name: 'Ethereum' },
-    { symbol: 'SOL', name: 'Solana' },
-    { symbol: 'BNB', name: 'BNB' },
-    { symbol: 'AVAX', name: 'Avalanche' },
-    { symbol: 'SUI', name: 'Sui' },
-    { symbol: 'APT', name: 'Aptos' },
-    { symbol: 'HYPE', name: 'Hyperliquid' },
-    { symbol: 'LINK', name: 'Chainlink' },
-    { symbol: 'AAVE', name: 'Aave' },
-    { symbol: 'UNI', name: 'Uniswap' },
-    { symbol: 'XRP', name: 'XRP' },
-    { symbol: 'LTC', name: 'Litecoin' },
-    { symbol: 'DOT', name: 'Polkadot' },
-    { symbol: 'ATOM', name: 'Cosmos' },
-    { symbol: 'MATIC', name: 'Polygon' },
-    { symbol: 'ARB', name: 'Arbitrum' },
-    { symbol: 'OP', name: 'Optimism' },
-    { symbol: 'DOGE', name: 'Dogecoin' },
-    { symbol: 'TIA', name: 'Celestia' },
-];
+// Convert curated assets to format needed for generation
+const COINS_TO_ANALYZE = CURATED_ASSETS;
 
 const HYPERLIQUID_ONLY_COINS = ['HYPE'];
 
@@ -151,7 +131,7 @@ export async function GET(request: NextRequest) {
         log.debug(`Coins in cooldown: ${recentlyClosed.join(', ') || 'none'}`);
 
         // 3. Find coins without pending signals AND not in cooldown
-        const allCoins = COINS_TO_ANALYZE.map(c => c.symbol);
+        const allCoins = [...COINS_TO_ANALYZE];
         const coinsToGenerate = allCoins.filter(coin =>
             !pendingCoins.has(coin.toUpperCase()) &&
             !recentlyClosed.includes(coin.toUpperCase())
@@ -219,7 +199,8 @@ export async function GET(request: NextRequest) {
         }
 
         // 6. Check if learning should trigger (global)
-        const consecutiveLosses = await getConsecutiveLosses();
+        const lossStreak = await findUnprocessedLossStreak();
+        const consecutiveLosses = lossStreak.count;
         if (consecutiveLosses >= 3) {
             log.info(`${consecutiveLosses} consecutive losses - learning needed`);
         }
