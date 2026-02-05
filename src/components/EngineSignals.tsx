@@ -8,10 +8,9 @@ import { useAuth } from '@/context/auth-context';
 import {
     getOpenSignals,
     addSignalToDb,
-    updateSignalOutcome as updateSignalInDb,
-    getTrackingStats,
     DbSignal
 } from '@/lib/supabase';
+
 import { logger } from '@/lib/logger';
 
 interface EngineSignal extends SignalOutput {
@@ -74,28 +73,11 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
                 currentOpenSignals.map(s => `${s.coin}:${s.direction}`)
             );
 
-            // FIRST: Check and update outcomes for open signals
-            for (const openSignal of currentOpenSignals) {
-                const currentMarketSignal = newSignals.find(s => s.coin === openSignal.coin);
-                if (!currentMarketSignal) continue;
+            // NOTE: Outcome checking is handled by the server-side cron/monitor
+            // which includes proper momentum checking before exiting at 3%+
+            // Client only tracks new signals here.
 
-                const currentPrice = currentMarketSignal.entryPrice; // entryPrice from API is current market price
-                const outcome = checkOutcome(openSignal, currentPrice);
-
-                if (outcome) {
-                    logger.debug(`${openSignal.coin} ${outcome.outcome} - ${outcome.reason}`);
-                    await updateSignalInDb(
-                        openSignal.id,
-                        outcome.outcome,
-                        currentPrice,
-                        outcome.reason,
-                        outcome.profitPct
-                    );
-                    // Learning is now handled by cron/learn endpoint
-                }
-            }
-
-            // SECOND: Track new LONG/SHORT signals (with deduplication)
+            // Track new LONG/SHORT signals (with deduplication)
             const actionableSignals = newSignals.filter(s =>
                 s.direction !== 'HOLD' &&
                 !existingPendingKeys.has(`${s.coin}:${s.direction}`)
@@ -132,40 +114,7 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
         }
     }, [user]);
 
-    // Check if a signal should close (hit SL or TP)
-    const checkOutcome = (
-        signal: DbSignal,
-        currentPrice: number
-    ): { outcome: 'WON' | 'LOST'; reason: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT'; profitPct: number } | null => {
-        const { entry_price, stop_loss, take_profit, direction } = signal;
-        const WIN_THRESHOLD_PCT = 3;
 
-        if (direction === 'LONG') {
-            const profitPct = ((currentPrice - entry_price) / entry_price) * 100;
-            if (currentPrice >= take_profit) {
-                return { outcome: 'WON', reason: 'TAKE_PROFIT', profitPct };
-            }
-            if (profitPct >= WIN_THRESHOLD_PCT) {
-                return { outcome: 'WON', reason: 'TARGET_3_PERCENT', profitPct };
-            }
-            if (currentPrice <= stop_loss) {
-                return { outcome: 'LOST', reason: 'STOP_LOSS', profitPct };
-            }
-        } else if (direction === 'SHORT') {
-            const profitPct = ((entry_price - currentPrice) / entry_price) * 100;
-            if (currentPrice <= take_profit) {
-                return { outcome: 'WON', reason: 'TAKE_PROFIT', profitPct };
-            }
-            if (profitPct >= WIN_THRESHOLD_PCT) {
-                return { outcome: 'WON', reason: 'TARGET_3_PERCENT', profitPct };
-            }
-            if (currentPrice >= stop_loss) {
-                return { outcome: 'LOST', reason: 'STOP_LOSS', profitPct };
-            }
-        }
-
-        return null;
-    };
 
     useEffect(() => {
         async function fetchSignals() {
