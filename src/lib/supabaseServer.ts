@@ -220,6 +220,10 @@ export async function getLastLearnedSignalId(): Promise<string | null> {
 /**
  * Find any streak of 3+ consecutive losses that hasn't been processed yet.
  * Returns the count of the streak and the signal IDs involved.
+ * 
+ * Logic: Scans chronologically and looks for ANY 3+ consecutive losses.
+ * When a WIN is encountered, if we have a streak of 3+, return it.
+ * Otherwise reset and keep looking.
  */
 export async function findUnprocessedLossStreak(): Promise<{
     count: number;
@@ -248,7 +252,6 @@ export async function findUnprocessedLossStreak(): Promise<{
 
     // Scan for any streak of 3+ losses after the last learning event
     let currentStreak: { id: string; closedAt: string }[] = [];
-    let foundStreak: { id: string; closedAt: string }[] = [];
 
     for (const signal of data) {
         // Skip signals that were already processed by a learning event
@@ -258,27 +261,31 @@ export async function findUnprocessedLossStreak(): Promise<{
 
         if (signal.outcome === 'LOST') {
             currentStreak.push({ id: signal.id, closedAt: signal.closed_at });
-
-            // Found a streak of 3+ losses
-            if (currentStreak.length >= 3 && foundStreak.length === 0) {
-                foundStreak = [...currentStreak];
-            }
         } else {
-            // Reset streak on any WIN
+            // WIN encountered - check if we have a valid streak to return
+            if (currentStreak.length >= 3) {
+                return {
+                    count: currentStreak.length,
+                    signalIds: currentStreak.map(s => s.id),
+                };
+            }
+            // Not enough losses - reset and keep looking
             currentStreak = [];
         }
     }
 
-    // If we found a streak after the last learning, return it
-    if (foundStreak.length >= 3) {
+    // Check if we ended with a valid streak (trailing losses)
+    if (currentStreak.length >= 3) {
         return {
-            count: foundStreak.length,
-            signalIds: foundStreak.map(s => s.id),
+            count: currentStreak.length,
+            signalIds: currentStreak.map(s => s.id),
         };
     }
 
     return { count: 0, signalIds: [] };
 }
+
+
 
 
 /**

@@ -164,9 +164,15 @@ async function runGlobalLearningCycle(): Promise<{
     const lossStreak = await findUnprocessedLossStreak();
     const consecutiveLosses = lossStreak.count;
 
+    log.debug(`Loss streak found: ${consecutiveLosses} consecutive losses`, {
+        signalIds: lossStreak.signalIds,
+        threshold: LEARNING_CONFIG.consecutiveLossThreshold,
+    });
+
     if (consecutiveLosses < LEARNING_CONFIG.consecutiveLossThreshold) {
         return { triggered: false, consecutiveLosses, adjustments: [] };
     }
+
 
     const losingSignals = await getRecentLosingSignals(20);
 

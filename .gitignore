@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Temp debug files
+hyperliquid_response.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
