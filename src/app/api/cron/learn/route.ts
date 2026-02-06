@@ -122,9 +122,19 @@ function analyzeLosingSignals(
                 if (direction === 'SHORT' && value < 0) wasWronglyConfident = true;
             }
 
-            // ADX analysis
+            // ADX analysis - FIXED: Only penalize if ADX direction matched signal direction
+            // ADX > 25 just means strong trend, we need to check if plusDI > minusDI (bullish) or not
             if (name === 'adx' && value > 25) {
-                wasWronglyConfident = true;
+                const plusDI = indicators['plusDI'];
+                const minusDI = indicators['minusDI'];
+                if (plusDI !== undefined && minusDI !== undefined) {
+                    const adxDirection = plusDI > minusDI ? 'LONG' : 'SHORT';
+                    // Only penalize if ADX was pointing in our direction but we still lost
+                    if (adxDirection === direction) {
+                        wasWronglyConfident = true;
+                    }
+                }
+                // If plusDI/minusDI not available (legacy signals), don't penalize
             }
 
             // Volume indicators

@@ -12,7 +12,7 @@
 // Core types
 export type { OHLCV, IndicatorResult } from './indicators';
 export type { SignalDirection, RiskLevels, SupportResistance } from './risk';
-export type { SignalOutput, IndicatorWeights } from './scoring';
+export type { SignalOutput, IndicatorWeights, HyperliquidContext } from './scoring';
 
 // Indicators
 export {

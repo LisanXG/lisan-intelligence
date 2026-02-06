@@ -7,6 +7,12 @@
 
 import { OHLCV, analyzeAsset, IndicatorResult } from './indicators';
 import { calculateRiskLevels, RiskLevels, SignalDirection } from './risk';
+import {
+    HyperliquidAssetContext,
+    FundingRateSignal,
+    OIChangeSignal,
+    calculatePositioningScore,
+} from './hyperliquidData';
 
 // ============================================================================
 // TYPES
@@ -26,15 +32,30 @@ export interface IndicatorWeights {
     adx: number;
     bollinger: number;
 
-    // Volume (20 points total)
+    // Volume (16 points total - reduced from 20)
     obvTrend: number;
     volumeRatio: number;
 
-    // Volatility (15 points - used for confidence, not direction)
+    // Volatility (16 points - reduced from 22)
     zScore: number;
 
-    // Sentiment (15 points)
+    // Sentiment (8 points)
     fearGreed: number;
+
+    // Positioning (10 points - NEW: Hyperliquid institutional data)
+    fundingRate: number;
+    oiChange: number;
+}
+
+/**
+ * Optional Hyperliquid context for enhanced signals
+ */
+export interface HyperliquidContext {
+    fundingRate: number;        // 1hr funding rate
+    annualizedFunding: number;  // fundingRate * 8760
+    openInterest: number;       // Current OI
+    prevOpenInterest?: number;  // Previous OI for change calculation
+    priceChange?: number;       // Price change percentage for OI signal
 }
 
 export interface SignalOutput {
@@ -54,6 +75,7 @@ export interface SignalOutput {
         trend: { score: number; max: number };
         volume: { score: number; max: number };
         sentiment: { score: number; max: number };
+        positioning: { score: number; max: number }; // NEW
     };
 
     // Raw indicator values (for learning)
@@ -80,15 +102,19 @@ export const DEFAULT_WEIGHTS: IndicatorWeights = {
     adx: 6,
     bollinger: 4,
 
-    // Volume: 20 points
+    // Volume: 16 points (reduced from 20)
     obvTrend: 10,
-    volumeRatio: 10,
+    volumeRatio: 6,
 
-    // Volatility: 15 points (confidence modifier)
-    zScore: 15,
+    // Volatility: 16 points (reduced from 22)
+    zScore: 16,
 
-    // Sentiment: 15 points (external data)
-    fearGreed: 15,
+    // Sentiment: 8 points
+    fearGreed: 8,
+
+    // Positioning: 10 points (NEW)
+    fundingRate: 6,
+    oiChange: 4,
 };
 
 // ============================================================================
@@ -220,12 +246,14 @@ function calculateSentimentScore(
  * @param coin - Coin symbol (e.g., "BTC")
  * @param fearGreedIndex - Optional Fear & Greed index value
  * @param weights - Optional custom weights
+ * @param hlContext - Optional Hyperliquid context for positioning data
  */
 export function generateSignal(
     data: OHLCV[],
     coin: string,
     fearGreedIndex: number | null = null,
-    weights: IndicatorWeights = DEFAULT_WEIGHTS
+    weights: IndicatorWeights = DEFAULT_WEIGHTS,
+    hlContext: HyperliquidContext | null = null
 ): SignalOutput {
     // Run all indicators
     const analysis = analyzeAsset(data);
@@ -236,12 +264,40 @@ export function generateSignal(
     const volume = calculateVolumeScore(analysis, weights);
     const sentiment = calculateSentimentScore(fearGreedIndex, weights);
 
+    // Calculate positioning score from Hyperliquid data (NEW)
+    let positioning = { score: 0, max: weights.fundingRate + weights.oiChange, direction: 0 };
+    let fundingRateValue = 0;
+    let oiChangeValue = 0;
+
+    if (hlContext) {
+        const fundingSignal = FundingRateSignal(hlContext.annualizedFunding);
+        fundingRateValue = fundingSignal.value;
+
+        let oiSignal: IndicatorResult = { value: 0, signal: 'neutral', strength: 0 };
+        if (hlContext.prevOpenInterest !== undefined && hlContext.priceChange !== undefined) {
+            oiSignal = OIChangeSignal(
+                hlContext.openInterest,
+                hlContext.prevOpenInterest,
+                hlContext.priceChange
+            );
+            oiChangeValue = oiSignal.value;
+        }
+
+        positioning = calculatePositioningScore(
+            fundingSignal,
+            oiSignal,
+            weights.fundingRate,
+            weights.oiChange
+        );
+    }
+
     // Total directional bias (positive = bullish, negative = bearish)
-    const totalDirection = momentum.direction + trend.direction + volume.direction + sentiment.direction;
+    const totalDirection = momentum.direction + trend.direction + volume.direction +
+        sentiment.direction + positioning.direction;
 
     // Total confidence score (0-100)
-    const totalMax = momentum.max + trend.max + volume.max + sentiment.max;
-    const rawScore = momentum.score + trend.score + volume.score + sentiment.score;
+    const totalMax = momentum.max + trend.max + volume.max + sentiment.max + positioning.max;
+    const rawScore = momentum.score + trend.score + volume.score + sentiment.score + positioning.score;
     const score = Math.round((rawScore / totalMax) * 100);
 
     // Determine direction based on consensus
@@ -249,8 +305,8 @@ export function generateSignal(
 
     // Need significant bias and minimum score to trigger signal
     // Tuned for reasonable signal distribution (not too many HOLD)
-    const directionThreshold = totalMax * 0.10; // 10% of max in one direction (was 15%)
-    const scoreThreshold = 35; // Minimum 35/100 confidence (was 40)
+    const directionThreshold = totalMax * 0.10; // 10% of max in one direction
+    const scoreThreshold = 50; // Minimum 50/100 confidence (raised from 35 to filter low-conviction signals)
 
     if (totalDirection > directionThreshold && score >= scoreThreshold) {
         direction = 'LONG';
@@ -271,12 +327,17 @@ export function generateSignal(
         emaAlignment: analysis.trend.emaAlignment.value,
         ichimoku: analysis.trend.ichimoku.result.value,
         adx: analysis.trend.adx.adx,
+        plusDI: analysis.trend.adx.plusDI,
+        minusDI: analysis.trend.adx.minusDI,
         bollinger: analysis.trend.bollingerPosition.position,
         obvTrend: analysis.volume.obvTrend.value,
         volumeRatio: analysis.volume.volumeRatio.value,
         zScore: analysis.volatility.zScore.value,
         atr: analysis.volatility.atr,
         vwap: analysis.trend.vwap,
+        // NEW: Hyperliquid positioning data
+        fundingRate: fundingRateValue,
+        oiChange: oiChangeValue,
     };
 
     return {
@@ -292,6 +353,7 @@ export function generateSignal(
             trend: { score: trend.score, max: trend.max },
             volume: { score: volume.score, max: volume.max },
             sentiment: { score: sentiment.score, max: sentiment.max },
+            positioning: { score: positioning.score, max: positioning.max },
         },
         indicators,
         timestamp: new Date(),

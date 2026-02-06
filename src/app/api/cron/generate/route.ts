@@ -21,32 +21,57 @@ import {
     OHLCV,
     DEFAULT_WEIGHTS,
     IndicatorWeights,
+    HyperliquidContext,
 } from '@/lib/engine';
 import { CURATED_ASSETS } from '@/lib/constants/assets';
+import { fetchHyperliquidMarketContext } from '@/lib/engine/hyperliquidData';
+import { detectMarketRegime, MarketContext, MarketRegime } from '@/lib/engine/regime';
 
 const HYPERLIQUID_API = 'https://api.hyperliquid.xyz/info';
 
 // Convert curated assets to format needed for generation
 const COINS_TO_ANALYZE = CURATED_ASSETS;
 
-const HYPERLIQUID_ONLY_COINS = ['HYPE'];
+const BINANCE_ONLY_COINS = ['AVAX', 'ATOM', 'LTC']; // Coins with poor HL coverage
 
 /**
- * Fetch OHLCV data from Binance
+ * Fetch OHLCV data - Binance primary, Hyperliquid fallback
+ * IMPORTANT: We use Binance first because HL 4h candles have stale close prices
  */
 async function fetchOHLCV(symbol: string): Promise<OHLCV[]> {
-    if (HYPERLIQUID_ONLY_COINS.includes(symbol.toUpperCase())) {
-        return fetchHyperliquidCandles(symbol);
+    // Try Binance first (primary) - has more recent candle data
+    try {
+        const binanceData = await fetchBinanceCandles(symbol);
+        if (binanceData.length >= 50) {
+            return binanceData;
+        }
+    } catch {
+        // Binance failed, try Hyperliquid
     }
 
+    // Fallback to Hyperliquid
+    try {
+        const hlData = await fetchHyperliquidCandles(symbol);
+        if (hlData.length >= 50) {
+            return hlData;
+        }
+    } catch {
+        // Both failed
+    }
+
+    return [];
+}
+
+/**
+ * Fetch candles from Binance (fallback)
+ */
+async function fetchBinanceCandles(symbol: string): Promise<OHLCV[]> {
     try {
         const binanceSymbol = `${symbol.toUpperCase()}USDT`;
         const url = `https://api.binance.com/api/v3/klines?symbol=${binanceSymbol}&interval=4h&limit=100`;
         const response = await fetch(url);
 
-        if (!response.ok) {
-            return fetchHyperliquidCandles(symbol);
-        }
+        if (!response.ok) return [];
 
         const klines = await response.json();
         return klines.map((k: number[]) => ({
@@ -58,7 +83,7 @@ async function fetchOHLCV(symbol: string): Promise<OHLCV[]> {
             volume: parseFloat(String(k[5])),
         }));
     } catch {
-        return fetchHyperliquidCandles(symbol);
+        return [];
     }
 }
 
@@ -156,7 +181,30 @@ export async function GET(request: NextRequest) {
         // 4. Fetch Fear & Greed once
         const fearGreed = await fetchFearGreed();
 
-        // 5. Generate signals for missing coins
+        // 5. Fetch Hyperliquid market context for positioning data (NEW)
+        const hlMarketContext = await fetchHyperliquidMarketContext(coinsToGenerate);
+        log.debug(`Fetched HL context for ${hlMarketContext?.assets.size || 0} coins`);
+
+        // 6. Detect market regime (NEW)
+        const btcOHLCV = await fetchOHLCV('BTC');
+        const altcoinChanges = coinsToGenerate
+            .filter(c => c !== 'BTC')
+            .map(c => {
+                const asset = hlMarketContext?.assets.get(c.toUpperCase());
+                return asset?.premium ? asset.premium * 100 : 0;
+            });
+
+        const regimeContext: MarketContext = {
+            btcData: btcOHLCV,
+            altcoinChanges,
+            avgFunding: hlMarketContext?.avgFunding || 0,
+            avgOIChange: 0,
+        };
+
+        const regimeAnalysis = detectMarketRegime(regimeContext);
+        log.info(`Market regime: ${regimeAnalysis.regime} (${Math.round(regimeAnalysis.confidence * 100)}% confidence)`);
+
+        // 7. Generate signals for missing coins
         const generated: { coin: string; direction: string; score: number }[] = [];
 
         for (const coin of coinsToGenerate) {
@@ -167,7 +215,26 @@ export async function GET(request: NextRequest) {
                 continue;
             }
 
-            const signal = generateSignal(ohlcv, coin, fearGreed, effectiveWeights);
+            // Build HL context for this coin if available
+            let hlContext: HyperliquidContext | null = null;
+            const hlAsset = hlMarketContext?.assets.get(coin.toUpperCase());
+            if (hlAsset) {
+                // Calculate price change from OHLCV
+                const priceChange = ohlcv.length >= 2
+                    ? ((ohlcv[ohlcv.length - 1].close - ohlcv[ohlcv.length - 2].close) /
+                        ohlcv[ohlcv.length - 2].close) * 100
+                    : 0;
+
+                hlContext = {
+                    fundingRate: hlAsset.fundingRate,
+                    annualizedFunding: hlAsset.annualizedFunding,
+                    openInterest: hlAsset.openInterest,
+                    // Note: We don't have prevOpenInterest yet - will add in Phase 3
+                    priceChange,
+                };
+            }
+
+            const signal = generateSignal(ohlcv, coin, fearGreed, effectiveWeights, hlContext);
 
             // Only add if not HOLD
             if (signal.direction !== 'HOLD') {
@@ -183,7 +250,11 @@ export async function GET(request: NextRequest) {
                     entry_price: signal.entryPrice,
                     stop_loss: signal.stopLoss,
                     take_profit: signal.takeProfit,
-                    indicator_snapshot: signal.indicators,
+                    indicator_snapshot: {
+                        ...signal.indicators,
+                        regime: regimeAnalysis.regime,
+                        regimeConfidence: regimeAnalysis.confidence,
+                    } as unknown as Record<string, number>,
                     weights_used: effectiveWeights as unknown as Record<string, number>,
                 });
 
