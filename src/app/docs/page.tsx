@@ -429,7 +429,7 @@ export default function DocsPage() {
                                 <div>
                                     <h4 className="text-xl font-semibold text-emerald-700 mb-4 flex items-center gap-3">
                                         <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
-                                        Sentiment &amp; Volatility (30 points)
+                                        Sentiment & Volatility (24 points)
                                     </h4>
                                     <p className="text-slate-600 mb-4">
                                         The market is people. And people are emotional. These indicators measure fear, greed,
@@ -437,7 +437,7 @@ export default function DocsPage() {
                                     </p>
                                     <div className="bg-slate-50 rounded-lg p-4 space-y-4">
                                         <div>
-                                            <p className="font-semibold text-slate-700">Fear &amp; Greed Index (15 pts)</p>
+                                            <p className="font-semibold text-slate-700">Fear & Greed Index (8 pts)</p>
                                             <p className="text-slate-600">
                                                 Aggregated market sentiment from multiple sources. Below 25 = Extreme Fear (historically a buying opportunity —
                                                 &quot;be greedy when others are fearful&quot;). Above 75 = Extreme Greed (historically time to be cautious —
@@ -445,7 +445,7 @@ export default function DocsPage() {
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="font-semibold text-slate-700">Z-Score (15 pts)</p>
+                                            <p className="font-semibold text-slate-700">Z-Score (16 pts)</p>
                                             <p className="text-slate-600">
                                                 Statistical measure of how far price has deviated from the mean. Below -2 = price is 2+ standard deviations
                                                 below average (statistically oversold). Above +2 = statistically overbought. Mean reversion is a powerful force.
@@ -453,17 +453,37 @@ export default function DocsPage() {
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Positioning - NEW in Engine v4 */}
+                                <div>
+                                    <h4 className="text-xl font-semibold text-indigo-700 mb-4 flex items-center gap-3">
+                                        <span className="w-3 h-3 rounded-full bg-indigo-500"></span>
+                                        Positioning (10 points) — NEW
+                                    </h4>
+                                    <p className="text-slate-600 mb-4">
+                                        Real-time derivatives data from Hyperliquid. Where is the crowd positioned?
+                                        Crowded trades tend to unwind violently.
+                                    </p>
+                                    <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+                                        <div>
+                                            <p className="font-semibold text-slate-700">Funding Rate (6 pts)</p>
+                                            <p className="text-slate-600">
+                                                Perpetual futures funding rate from Hyperliquid. Highly negative funding = crowded shorts (bullish).
+                                                Highly positive funding = crowded longs (bearish). Extreme funding often precedes reversals.
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-slate-700">Open Interest Change (4 pts)</p>
+                                            <p className="text-slate-600">
+                                                Rate of change in open interest. Rising OI with rising price = strong trend.
+                                                Rising OI with falling price = aggressive shorting. Divergences signal potential reversals.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="mt-8 p-4 bg-cyan-50 border border-cyan-200 rounded-lg">
-                                <p className="font-semibold text-cyan-800 mb-2">Hyperliquid Funding Rate Adjustment</p>
-                                <p className="text-cyan-700">
-                                    After the base score is calculated, we apply a post-scoring adjustment based on live funding rate data from Hyperliquid.
-                                    If funding confirms direction (e.g., crowded shorts + LONG signal), we add <strong>+5 points</strong>.
-                                    If funding contradicts direction, we subtract <strong>-3 points</strong>.
-                                    The asymmetry is intentional — confirmation is weighted more heavily than conflict.
-                                </p>
-                            </div>
+
                         </Accordion>
 
                         <Accordion title="Scoring Algorithm — The Math">
