@@ -291,7 +291,7 @@ export default function DocsPage() {
                             </div>
                         </Accordion>
 
-                        <Accordion title="The 14 Indicators — Complete Breakdown">
+                        <Accordion title="The 16 Indicators — Complete Breakdown">
                             <p className="mb-6">
                                 Every indicator in the engine outputs three things:
                             </p>
@@ -472,7 +472,7 @@ export default function DocsPage() {
                             </p>
 
                             <div className="bg-slate-900 rounded-lg p-6 font-mono text-slate-300 mb-6 overflow-x-auto text-sm md:text-base">
-                                <div className="text-slate-500 mb-3">// For each of the 14 indicators:</div>
+                                <div className="text-slate-500 mb-3">// For each of the 16 indicators:</div>
                                 <div className="mb-4">
                                     <div>points = weight × strength</div>
                                     <div className="mt-2">if (signal === &apos;bullish&apos;) totalBullish += points</div>
