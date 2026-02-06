@@ -72,14 +72,10 @@ export default function QuantView({ signals }: QuantViewProps) {
         }
     };
 
-    // Sort indicator
-    const SortIcon = ({ column }: { column: SortKey }) => {
-        if (sortKey !== column) return null;
-        return (
-            <span className="ml-1">
-                {sortDir === 'asc' ? '↑' : '↓'}
-            </span>
-        );
+    // Sort indicator helper
+    const getSortIcon = (column: SortKey) => {
+        if (sortKey !== column) return '';
+        return sortDir === 'asc' ? ' ↑' : ' ↓';
     };
 
     // Format price
@@ -123,25 +119,25 @@ export default function QuantView({ signals }: QuantViewProps) {
                                 onClick={() => handleSort('coin')}
                                 className="text-left py-3 px-4 text-[var(--text-muted)] font-medium cursor-pointer hover:text-[var(--text-primary)] transition-colors"
                             >
-                                Coin <SortIcon column="coin" />
+                                Coin{getSortIcon('coin')}
                             </th>
                             <th
                                 onClick={() => handleSort('direction')}
                                 className="text-left py-3 px-4 text-[var(--text-muted)] font-medium cursor-pointer hover:text-[var(--text-primary)] transition-colors"
                             >
-                                Dir <SortIcon column="direction" />
+                                Dir{getSortIcon('direction')}
                             </th>
                             <th
                                 onClick={() => handleSort('score')}
                                 className="text-center py-3 px-4 text-[var(--text-muted)] font-medium cursor-pointer hover:text-[var(--text-primary)] transition-colors"
                             >
-                                Score <SortIcon column="score" />
+                                Score{getSortIcon('score')}
                             </th>
                             <th
                                 onClick={() => handleSort('entry')}
                                 className="text-right py-3 px-4 text-[var(--text-muted)] font-medium cursor-pointer hover:text-[var(--text-primary)] transition-colors"
                             >
-                                Entry <SortIcon column="entry" />
+                                Entry{getSortIcon('entry')}
                             </th>
                             <th className="text-right py-3 px-4 text-[var(--text-muted)] font-medium">
                                 SL
@@ -153,13 +149,13 @@ export default function QuantView({ signals }: QuantViewProps) {
                                 onClick={() => handleSort('rr')}
                                 className="text-center py-3 px-4 text-[var(--text-muted)] font-medium cursor-pointer hover:text-[var(--text-primary)] transition-colors"
                             >
-                                R:R <SortIcon column="rr" />
+                                R:R{getSortIcon('rr')}
                             </th>
                             <th
                                 onClick={() => handleSort('timestamp')}
                                 className="text-right py-3 px-4 text-[var(--text-muted)] font-medium cursor-pointer hover:text-[var(--text-primary)] transition-colors"
                             >
-                                Time <SortIcon column="timestamp" />
+                                Time{getSortIcon('timestamp')}
                             </th>
                         </tr>
                     </thead>
@@ -183,16 +179,16 @@ export default function QuantView({ signals }: QuantViewProps) {
                                 </td>
                                 <td className="py-3 px-4">
                                     <span className={`text-xs font-semibold px-2 py-0.5 rounded ${signal.direction === 'LONG' ? 'bg-[rgba(16,185,129,0.15)] text-[var(--accent-green)]' :
-                                            signal.direction === 'SHORT' ? 'bg-[rgba(239,68,68,0.15)] text-[var(--accent-red)]' :
-                                                'bg-[rgba(100,116,139,0.15)] text-[var(--text-muted)]'
+                                        signal.direction === 'SHORT' ? 'bg-[rgba(239,68,68,0.15)] text-[var(--accent-red)]' :
+                                            'bg-[rgba(100,116,139,0.15)] text-[var(--text-muted)]'
                                         }`}>
                                         {signal.direction}
                                     </span>
                                 </td>
                                 <td className="py-3 px-4 text-center">
                                     <span className={`font-bold ${signal.score >= 70 ? 'text-[var(--accent-green)]' :
-                                            signal.score >= 55 ? 'text-[var(--accent-orange)]' :
-                                                'text-[var(--accent-red)]'
+                                        signal.score >= 55 ? 'text-[var(--accent-orange)]' :
+                                            'text-[var(--accent-red)]'
                                         }`}>
                                         {signal.score}
                                     </span>

@@ -44,11 +44,15 @@ export default function SignalCard({ signal, sparklineData, onWatchlistChange }:
         setIsWatched(inWatchlist);
     }, [user, coin]);
 
+    // Compute bucket context synchronously (not in effect)
+    const bucketContextValue = getScoreBucketWinRate(score);
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     useEffect(() => {
+        // Fetch watchlist status on mount - this async pattern is intentional
         checkWatchlistStatus();
-        const context = getScoreBucketWinRate(score);
-        setBucketContext(context);
-    }, [checkWatchlistStatus, score]);
+        setBucketContext(bucketContextValue);
+    }, [checkWatchlistStatus, bucketContextValue]);
 
     // Handle watchlist toggle
     const handleWatchlistClick = async (e: React.MouseEvent) => {

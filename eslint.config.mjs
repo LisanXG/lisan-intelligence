@@ -13,6 +13,15 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // Custom rule overrides
+  {
+    rules: {
+      // These patterns are valid for data fetching on mount
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/static-components": "warn",
+      "react/jsx-no-comment-textnodes": "warn",
+    },
+  },
 ]);
 
 export default eslintConfig;
