@@ -192,9 +192,14 @@ export function calculateRiskLevels(
         stopLoss = Math.max(atrStopLoss, nearestSupport * 0.995); // Slightly below support
         takeProfit = Math.min(atrTakeProfit, nearestResistance * 0.995); // Slightly below resistance
 
-        // Ensure minimum distance
+        // Ensure minimum distance (at least 2% above entry)
         if (takeProfit <= currentPrice * 1.02) {
             takeProfit = currentPrice + (atrMultiplierTP * atrValue);
+        }
+
+        // Final sanity check: TP must be above entry for LONG
+        if (takeProfit <= currentPrice) {
+            takeProfit = currentPrice * 1.05; // Force 5% above entry as last resort
         }
     } else if (direction === 'SHORT') {
         // ATR-based levels
@@ -203,11 +208,17 @@ export function calculateRiskLevels(
 
         // Use tighter of ATR or support/resistance
         stopLoss = Math.min(atrStopLoss, nearestResistance * 1.005); // Slightly above resistance
+        // For SHORT: TP must be BELOW entry, use the HIGHER of (atrTP, support) but cap at entry
         takeProfit = Math.max(atrTakeProfit, nearestSupport * 1.005); // Slightly above support
 
-        // Ensure minimum distance
+        // CRITICAL: Ensure TP is always at least 2% below entry for SHORT
         if (takeProfit >= currentPrice * 0.98) {
             takeProfit = currentPrice - (atrMultiplierTP * atrValue);
+        }
+
+        // Final sanity check: TP must be below entry for SHORT
+        if (takeProfit >= currentPrice) {
+            takeProfit = currentPrice * 0.95; // Force 5% below entry as last resort
         }
     } else {
         // HOLD - no trade, return neutral values
