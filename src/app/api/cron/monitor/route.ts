@@ -155,9 +155,12 @@ async function checkSignalOutcome(
     if (direction === 'LONG') {
         const profitPct = ((currentPrice - entry_price) / entry_price) * 100;
 
-        // Hit full TP - always take it
+        // Hit full TP - take it (but validate profit is actually positive)
         if (currentPrice >= take_profit) {
-            return { hit: true, outcome: 'WON', exitReason: 'TAKE_PROFIT', profitPct };
+            // Sanity check: if TP hit but profit negative, it's a bad TP calculation
+            const outcome = profitPct >= 0 ? 'WON' : 'LOST';
+            const exitReason = profitPct >= 0 ? 'TAKE_PROFIT' : 'STOP_LOSS';
+            return { hit: true, outcome, exitReason, profitPct };
         }
 
         // Hit 3% threshold - check momentum before exiting
@@ -183,9 +186,12 @@ async function checkSignalOutcome(
     } else if (direction === 'SHORT') {
         const profitPct = ((entry_price - currentPrice) / entry_price) * 100;
 
-        // Hit full TP - always take it
+        // Hit full TP - take it (but validate profit is actually positive)
         if (currentPrice <= take_profit) {
-            return { hit: true, outcome: 'WON', exitReason: 'TAKE_PROFIT', profitPct };
+            // Sanity check: if TP hit but profit negative, it's a bad TP calculation
+            const outcome = profitPct >= 0 ? 'WON' : 'LOST';
+            const exitReason = profitPct >= 0 ? 'TAKE_PROFIT' : 'STOP_LOSS';
+            return { hit: true, outcome, exitReason, profitPct };
         }
 
         // Hit 3% threshold - check momentum before exiting
