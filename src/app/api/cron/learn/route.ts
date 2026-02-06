@@ -235,6 +235,7 @@ async function runGlobalLearningCycle(): Promise<{
             signals_analyzed: losingSignals.length,
             adjustments,
             consecutive_losses: consecutiveLosses,
+            weights_snapshot: currentWeights, // Store weights after this event for fast restore
             created_at: learningEventTime, // Position at streak occurrence, not now
         });
     }

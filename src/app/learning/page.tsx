@@ -137,6 +137,30 @@ export default function LearningPage() {
         }
     };
 
+    const handleRestore = async (learningCycleId: string, eventDate: Date) => {
+        if (!user) return;
+        if (confirm(`Restore weights to state after ${eventDate.toLocaleString()}? This will apply weights from that learning event.`)) {
+            try {
+                const response = await fetch('/api/admin/restore-weights', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ learningCycleId }),
+                });
+
+                if (response.ok) {
+                    loadData(); // Refresh all data
+                    alert('Weights restored successfully!');
+                } else {
+                    const error = await response.text();
+                    console.error('Failed to restore weights:', error);
+                    alert('Failed to restore weights: ' + error);
+                }
+            } catch (error) {
+                console.error('Error restoring weights:', error);
+            }
+        }
+    };
+
     if (!mounted) {
         return (
             <>
@@ -260,9 +284,19 @@ export default function LearningPage() {
                                                     {new Date(event.timestamp).toLocaleString()}
                                                 </span>
                                             </div>
-                                            <div className="text-sm text-slate-600 mb-2">
-                                                Analyzed {event.signalsAnalyzed} signals •
-                                                {event.consecutiveLosses} consecutive losses
+                                            <div className="flex justify-between items-center mb-2">
+                                                <div className="text-sm text-slate-600">
+                                                    Analyzed {event.signalsAnalyzed} signals •
+                                                    {event.consecutiveLosses} consecutive losses
+                                                </div>
+                                                {isAdmin && (
+                                                    <button
+                                                        onClick={() => handleRestore(event.id, event.timestamp)}
+                                                        className="text-xs text-cyan-600 hover:text-cyan-700 font-medium px-2 py-1 rounded border border-cyan-200 hover:bg-cyan-50"
+                                                    >
+                                                        Restore
+                                                    </button>
+                                                )}
                                             </div>
                                             {event.adjustments.length > 0 && (
                                                 <div className="mt-3 space-y-2">
