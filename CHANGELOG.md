@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - ADX penalty bug in learning system
 - Stale entry price bug causing 0-minute impossible winners
+- **SL/TP recalculation from live price** — Prevents instant wins when TP was calculated from stale candle data
 - Signals blocked if live price unavailable or differs >5% from candle
 
 ## [3.1.16] - 2026-02-06
