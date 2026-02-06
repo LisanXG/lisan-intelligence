@@ -5,7 +5,7 @@ const TRACKED_COINS = [
     'bitcoin', 'ethereum', 'solana', 'binancecoin', 'avalanche-2',
     'sui', 'aptos', 'hyperliquid', 'chainlink', 'aave',
     'uniswap', 'ripple', 'litecoin', 'polkadot', 'cosmos',
-    'matic-network', 'arbitrum', 'optimism', 'dogecoin', 'celestia'
+    'matic-network', 'arbitrum', 'optimism', 'the-open-network', 'celestia'
 ];
 
 // Symbol to CoinGecko ID mapping for our tracked coins
@@ -28,7 +28,7 @@ const SYMBOL_TO_ID: Record<string, string> = {
     'matic': 'matic-network',
     'arb': 'arbitrum',
     'op': 'optimism',
-    'doge': 'dogecoin',
+    'ton': 'the-open-network',
     'tia': 'celestia'
 };
 

@@ -15,7 +15,7 @@ export const CURATED_ASSETS = [
     'SOL',   // Solana
     'AVAX',  // Avalanche
     'LINK',  // Chainlink
-    'TON',   // Toncoin (replaced DOGE - more stable)
+    'TON',   // Toncoin
     'XRP',   // Ripple
     'ADA',   // Cardano
     'DOT',   // Polkadot

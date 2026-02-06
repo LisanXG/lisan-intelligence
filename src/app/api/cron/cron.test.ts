@@ -205,7 +205,7 @@ describe('Cron Route Response Structure', () => {
                 { coin: 'BTC' }, { coin: 'ETH' }, { coin: 'SOL' }
             ]);
             (getRecentlyClosedCoins as ReturnType<typeof vi.fn>).mockResolvedValue([
-                'DOGE', 'LINK', 'AVAX', 'MATIC', 'UNI', 'AAVE', 'PEPE',
+                'TON', 'LINK', 'AVAX', 'MATIC', 'UNI', 'AAVE', 'PEPE',
                 'WIF', 'SUI', 'XRP', 'HYPE', 'OP', 'ARB', 'NEAR',
                 'INJ', 'TIA', 'RENDER'
             ]);

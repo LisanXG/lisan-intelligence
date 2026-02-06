@@ -198,7 +198,7 @@ const COINS_TO_ANALYZE = [
     { symbol: 'ARB', name: 'Arbitrum', image: 'https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg' },
     { symbol: 'OP', name: 'Optimism', image: 'https://assets.coingecko.com/coins/images/25244/small/Optimism.png' },
     // Memes (high volume)
-    { symbol: 'DOGE', name: 'Dogecoin', image: 'https://assets.coingecko.com/coins/images/5/small/dogecoin.png' },
+    { symbol: 'TON', name: 'Toncoin', image: 'https://assets.coingecko.com/coins/images/17980/small/ton_symbol.png' },
     { symbol: 'TIA', name: 'Celestia', image: 'https://assets.coingecko.com/coins/images/31967/small/tia.jpg' },
 ];
 

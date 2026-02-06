@@ -55,7 +55,7 @@ export interface HyperliquidData {
 const HYPERLIQUID_COINS = [
     'BTC', 'ETH', 'SOL', 'BNB', 'AVAX', 'SUI', 'APT', 'HYPE',
     'LINK', 'AAVE', 'UNI', 'XRP', 'LTC', 'DOT', 'ATOM',
-    'MATIC', 'ARB', 'OP', 'DOGE', 'TIA'
+    'MATIC', 'ARB', 'OP', 'TON', 'TIA'
 ];
 
 async function fetchHyperliquidMetaAndContext(): Promise<HyperliquidMetaAndContext | null> {
