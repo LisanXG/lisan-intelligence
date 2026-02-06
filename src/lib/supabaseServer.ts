@@ -351,3 +351,152 @@ export async function getRecentlyClosedCoins(cooldownHours: number = 4): Promise
     const coins = data?.map(s => s.coin.toUpperCase()) || [];
     return [...new Set(coins)];
 }
+
+// ============================================================================
+// PHASE 4: Context-Aware Learning Helpers
+// ============================================================================
+
+/**
+ * Get trailing win rate over last N closed signals
+ * Used for proactive learning trigger detection
+ */
+export async function getTrailingWinRate(windowSize: number = 10): Promise<{
+    winRate: number;
+    wins: number;
+    losses: number;
+    total: number;
+}> {
+    const { data, error } = await supabaseServer
+        .from('signals')
+        .select('outcome')
+        .in('outcome', ['WON', 'LOST'])
+        .order('closed_at', { ascending: false })
+        .limit(windowSize);
+
+    if (error || !data || data.length === 0) {
+        return { winRate: 0, wins: 0, losses: 0, total: 0 };
+    }
+
+    const wins = data.filter(s => s.outcome === 'WON').length;
+    const losses = data.filter(s => s.outcome === 'LOST').length;
+    const total = data.length;
+
+    return {
+        winRate: total > 0 ? (wins / total) * 100 : 0,
+        wins,
+        losses,
+        total,
+    };
+}
+
+/**
+ * Get directional stats (LONG vs SHORT performance)
+ */
+export async function getDirectionalStats(limit: number = 50): Promise<{
+    long: { wins: number; losses: number; winRate: number };
+    short: { wins: number; losses: number; winRate: number };
+}> {
+    const { data, error } = await supabaseServer
+        .from('signals')
+        .select('direction, outcome')
+        .in('outcome', ['WON', 'LOST'])
+        .order('closed_at', { ascending: false })
+        .limit(limit);
+
+    if (error || !data) {
+        return {
+            long: { wins: 0, losses: 0, winRate: 0 },
+            short: { wins: 0, losses: 0, winRate: 0 },
+        };
+    }
+
+    const longs = data.filter(s => s.direction === 'LONG');
+    const shorts = data.filter(s => s.direction === 'SHORT');
+
+    const longWins = longs.filter(s => s.outcome === 'WON').length;
+    const longLosses = longs.filter(s => s.outcome === 'LOST').length;
+    const shortWins = shorts.filter(s => s.outcome === 'WON').length;
+    const shortLosses = shorts.filter(s => s.outcome === 'LOST').length;
+
+    return {
+        long: {
+            wins: longWins,
+            losses: longLosses,
+            winRate: longs.length > 0 ? (longWins / longs.length) * 100 : 0,
+        },
+        short: {
+            wins: shortWins,
+            losses: shortLosses,
+            winRate: shorts.length > 0 ? (shortWins / shorts.length) * 100 : 0,
+        },
+    };
+}
+
+/**
+ * Get signals grouped by market regime
+ */
+export async function getSignalsByRegime(limit: number = 100): Promise<
+    Map<string, { wins: number; losses: number; total: number; winRate: number }>
+> {
+    const { data, error } = await supabaseServer
+        .from('signals')
+        .select('outcome, indicator_snapshot')
+        .in('outcome', ['WON', 'LOST'])
+        .order('closed_at', { ascending: false })
+        .limit(limit);
+
+    if (error || !data) {
+        return new Map();
+    }
+
+    const regimeStats = new Map<string, { wins: number; losses: number; total: number; winRate: number }>();
+
+    for (const signal of data) {
+        // Cast to record with possible string values for regime
+        const snapshot = signal.indicator_snapshot as Record<string, unknown> | null;
+        const regime = (snapshot?.regime as string) || 'UNKNOWN';
+
+        const existing = regimeStats.get(regime) || { wins: 0, losses: 0, total: 0, winRate: 0 };
+        existing.total++;
+        if (signal.outcome === 'WON') existing.wins++;
+        if (signal.outcome === 'LOST') existing.losses++;
+        existing.winRate = (existing.wins / existing.total) * 100;
+        regimeStats.set(regime, existing);
+    }
+
+    return regimeStats;
+}
+
+/**
+ * Count how many trades have passed since an indicator last appeared in a losing signal
+ * Used for weight recovery mechanism
+ */
+export async function getTradesSinceIndicatorLoss(indicatorName: string, limit: number = 50): Promise<number> {
+    const { data, error } = await supabaseServer
+        .from('signals')
+        .select('outcome, indicator_snapshot')
+        .in('outcome', ['WON', 'LOST'])
+        .order('closed_at', { ascending: false })
+        .limit(limit);
+
+    if (error || !data) {
+        return 0;
+    }
+
+    let tradesSinceLoss = 0;
+
+    for (const signal of data) {
+        if (signal.outcome === 'LOST') {
+            const snapshot = signal.indicator_snapshot as Record<string, unknown> | null;
+            if (snapshot && snapshot[indicatorName] !== undefined) {
+                // Found a loss where this indicator was present
+                return tradesSinceLoss;
+            }
+        }
+        tradesSinceLoss++;
+    }
+
+    // Indicator hasn't appeared in a loss in the last 'limit' trades
+    return tradesSinceLoss;
+}
+

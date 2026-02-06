@@ -134,6 +134,39 @@ async function fetchFearGreed(): Promise<number | null> {
     }
 }
 
+/**
+ * Fetch CURRENT live prices from Hyperliquid (mark prices)
+ * CRITICAL: Use this for entry_price, NOT candle close which can be stale
+ */
+async function fetchCurrentPrices(): Promise<Map<string, number>> {
+    try {
+        const response = await fetch(HYPERLIQUID_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'metaAndAssetCtxs' }),
+        });
+
+        if (!response.ok) return new Map();
+
+        interface HLAsset { name: string }
+        interface HLContext { markPx: string }
+        const [meta, assetCtxs] = await response.json() as [{ universe: HLAsset[] }, HLContext[]];
+        const prices = new Map<string, number>();
+
+        meta.universe.forEach((asset, idx) => {
+            const ctx = assetCtxs[idx];
+            if (ctx?.markPx) {
+                prices.set(asset.name.toUpperCase(), parseFloat(ctx.markPx));
+            }
+        });
+
+        return prices;
+    } catch (error) {
+        console.error('[CronGenerate] Error fetching live prices:', error);
+        return new Map();
+    }
+}
+
 export async function GET(request: NextRequest) {
     const secret = request.nextUrl.searchParams.get('secret');
     const cronSecret = process.env.CRON_SECRET;
@@ -204,7 +237,11 @@ export async function GET(request: NextRequest) {
         const regimeAnalysis = detectMarketRegime(regimeContext);
         log.info(`Market regime: ${regimeAnalysis.regime} (${Math.round(regimeAnalysis.confidence * 100)}% confidence)`);
 
-        // 7. Generate signals for missing coins
+        // 7. Fetch LIVE prices for accurate entry_price (CRITICAL FIX)
+        const livePrices = await fetchCurrentPrices();
+        log.debug(`Fetched live prices for ${livePrices.size} assets`);
+
+        // 8. Generate signals for missing coins
         const generated: { coin: string; direction: string; score: number }[] = [];
 
         for (const coin of coinsToGenerate) {
@@ -214,6 +251,9 @@ export async function GET(request: NextRequest) {
                 log.debug(`Insufficient data for ${coin}`);
                 continue;
             }
+
+            // Get LIVE price for this coin (CRITICAL: prevents stale entry_price bug)
+            const livePrice = livePrices.get(coin.toUpperCase());
 
             // Build HL context for this coin if available
             let hlContext: HyperliquidContext | null = null;
@@ -247,7 +287,8 @@ export async function GET(request: NextRequest) {
                     direction: signal.direction,
                     score: signal.score,
                     confidence: confidenceLabel,
-                    entry_price: signal.entryPrice,
+                    // CRITICAL: Use live price, NOT stale candle close
+                    entry_price: livePrice ?? signal.entryPrice,
                     stop_loss: signal.stopLoss,
                     take_profit: signal.takeProfit,
                     indicator_snapshot: {

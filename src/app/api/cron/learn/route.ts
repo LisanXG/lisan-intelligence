@@ -14,6 +14,9 @@ import {
     getGlobalWeights,
     updateGlobalWeights,
     supabaseServer,
+    getTrailingWinRate,
+    getDirectionalStats,
+    getTradesSinceIndicatorLoss,
 } from '@/lib/supabaseServer';
 import { DEFAULT_WEIGHTS, IndicatorWeights } from '@/lib/engine/scoring';
 
@@ -40,6 +43,12 @@ const LEARNING_CONFIG = {
     minWeight: 1,               // Minimum weight
     maxWeight: 20,              // Maximum weight
     consecutiveLossThreshold: 3, // Losses to trigger learning
+    // Phase 4: Weight recovery settings
+    recoveryThreshold: 20,       // Trades without indicator loss before recovery starts
+    recoveryRate: 0.05,          // Recover 5% of lost weight per check
+    // Phase 4: Proactive detection
+    proactiveWinRateThreshold: 50, // Trigger warning if trailing win rate drops below this
+    proactiveWindowSize: 10,      // Window size for trailing win rate calculation
 };
 
 // ============================================================================
@@ -258,6 +267,58 @@ async function runGlobalLearningCycle(): Promise<{
 }
 
 // ============================================================================
+// WEIGHT RECOVERY SYSTEM
+// ============================================================================
+
+/**
+ * Check for weights that should be recovered toward defaults
+ * Weights recover if the indicator hasn't appeared in a loss for N trades
+ */
+async function checkWeightRecovery(): Promise<WeightAdjustment[]> {
+    const storedWeights = await getGlobalWeights();
+    if (!storedWeights) return [];
+
+    const currentWeights = { ...DEFAULT_WEIGHTS, ...storedWeights } as IndicatorWeights;
+    const recoveryAdjustments: WeightAdjustment[] = [];
+
+    // Check each indicator that's below its default weight
+    for (const [indicator, defaultWeight] of Object.entries(DEFAULT_WEIGHTS) as [keyof IndicatorWeights, number][]) {
+        const currentWeight = currentWeights[indicator];
+
+        // Only recover if weight is below default (it was penalized)
+        if (currentWeight < defaultWeight) {
+            const tradesSinceLoss = await getTradesSinceIndicatorLoss(indicator);
+
+            if (tradesSinceLoss >= LEARNING_CONFIG.recoveryThreshold) {
+                // Calculate recovery amount (5% of the difference back toward default)
+                const difference = defaultWeight - currentWeight;
+                const recoveryAmount = difference * LEARNING_CONFIG.recoveryRate;
+                const newWeight = Math.min(defaultWeight, currentWeight + recoveryAmount);
+
+                if (Math.abs(newWeight - currentWeight) > 0.01) {
+                    currentWeights[indicator] = newWeight;
+
+                    recoveryAdjustments.push({
+                        indicator,
+                        oldWeight: Math.round(currentWeight * 100) / 100,
+                        newWeight: Math.round(newWeight * 100) / 100,
+                        changePercent: Math.round(((newWeight - currentWeight) / currentWeight) * 10000) / 100,
+                        reason: `Recovered: ${tradesSinceLoss} trades since last loss`,
+                    });
+                }
+            }
+        }
+    }
+
+    if (recoveryAdjustments.length > 0) {
+        await updateGlobalWeights(currentWeights as unknown as Record<string, number>);
+        log.info(`Weight recovery: ${recoveryAdjustments.length} indicators recovered`);
+    }
+
+    return recoveryAdjustments;
+}
+
+// ============================================================================
 // API HANDLER
 // ============================================================================
 
@@ -274,7 +335,21 @@ export async function GET(request: NextRequest) {
     const startTime = Date.now();
 
     try {
-        log.debug('Running global learning cycle (multi-streak mode)');
+        log.debug('Running context-aware learning cycle');
+
+        // Phase 4: Check trailing win rate for proactive detection
+        const trailingStats = await getTrailingWinRate(LEARNING_CONFIG.proactiveWindowSize);
+        const directionalStats = await getDirectionalStats(50);
+
+        const proactiveWarning = trailingStats.winRate < LEARNING_CONFIG.proactiveWinRateThreshold
+            && trailingStats.total >= 5; // Only warn if we have enough data
+
+        if (proactiveWarning) {
+            log.info(`Proactive warning: Win rate dropped to ${trailingStats.winRate.toFixed(1)}% (${trailingStats.wins}W/${trailingStats.losses}L)`);
+        }
+
+        // Phase 4: Check for weight recovery opportunities
+        const recoveryAdjustments = await checkWeightRecovery();
 
         // Loop to process ALL unprocessed loss streaks in one run
         const allResults: { consecutiveLosses: number; adjustments: WeightAdjustment[] }[] = [];
@@ -297,26 +372,40 @@ export async function GET(request: NextRequest) {
             log.debug(`Iteration ${i + 1}: Processed streak of ${result.consecutiveLosses} with ${result.adjustments.length} adjustments`);
         }
 
-        if (allResults.length === 0) {
-            return NextResponse.json({
-                success: true,
-                message: 'No loss streaks found to process',
-                learningTriggered: false,
-                streaksProcessed: 0,
-                duration: Date.now() - startTime,
-            });
-        }
-
-        log.info(`Learning complete: ${allResults.length} streaks processed, ${totalAdjustments} total adjustments`);
-
-        return NextResponse.json({
+        // Build comprehensive response
+        const response = {
             success: true,
-            learningTriggered: true,
+            // Loss streak processing
+            learningTriggered: allResults.length > 0,
             streaksProcessed: allResults.length,
             totalAdjustments,
-            results: allResults,
+            results: allResults.length > 0 ? allResults : undefined,
+            // Weight recovery
+            recoveryTriggered: recoveryAdjustments.length > 0,
+            recoveryAdjustments: recoveryAdjustments.length > 0 ? recoveryAdjustments : undefined,
+            // Proactive monitoring (Phase 4)
+            proactiveWarning,
+            trailingWinRate: Math.round(trailingStats.winRate * 10) / 10,
+            directionalStats: {
+                long: {
+                    winRate: Math.round(directionalStats.long.winRate * 10) / 10,
+                    record: `${directionalStats.long.wins}W-${directionalStats.long.losses}L`,
+                },
+                short: {
+                    winRate: Math.round(directionalStats.short.winRate * 10) / 10,
+                    record: `${directionalStats.short.wins}W-${directionalStats.short.losses}L`,
+                },
+            },
             duration: Date.now() - startTime,
-        });
+        };
+
+        if (allResults.length === 0 && recoveryAdjustments.length === 0) {
+            log.debug('No learning or recovery actions taken');
+        } else {
+            log.info(`Learning complete: ${allResults.length} streaks, ${recoveryAdjustments.length} recoveries`);
+        }
+
+        return NextResponse.json(response);
 
     } catch (error) {
         log.error('Learn error', error);
@@ -327,3 +416,4 @@ export async function GET(request: NextRequest) {
         }, { status: 500 });
     }
 }
+
