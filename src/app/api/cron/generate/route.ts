@@ -299,15 +299,34 @@ export async function GET(request: NextRequest) {
                     signal.score >= 80 ? 'HIGH' :
                         signal.score >= 60 ? 'MEDIUM' : 'LOW';
 
+                // CRITICAL FIX: Recalculate SL/TP from LIVE price, not stale candle
+                // The generateSignal() used candle close which can be hours old
+                // We use the ATR ratio from the signal to maintain proper risk:reward
+                const atrPercent = signal.indicators?.atr && signal.entryPrice
+                    ? (signal.indicators.atr as number) / signal.entryPrice
+                    : 0.015; // 1.5% default ATR if unavailable
+
+                let liveStopLoss: number;
+                let liveTakeProfit: number;
+
+                if (signal.direction === 'LONG') {
+                    liveStopLoss = livePrice * (1 - (atrPercent * 1.5));
+                    liveTakeProfit = livePrice * (1 + (atrPercent * 3));
+                } else {
+                    // SHORT
+                    liveStopLoss = livePrice * (1 + (atrPercent * 1.5));
+                    liveTakeProfit = livePrice * (1 - (atrPercent * 3));
+                }
+
                 const added = await addGlobalSignal({
                     coin: signal.coin,
                     direction: signal.direction,
                     score: signal.score,
                     confidence: confidenceLabel,
-                    // CRITICAL: Use live price, NOT stale candle close
+                    // CRITICAL: Use live price for entry AND recalculated SL/TP
                     entry_price: livePrice,
-                    stop_loss: signal.stopLoss,
-                    take_profit: signal.takeProfit,
+                    stop_loss: Number(liveStopLoss.toFixed(6)),
+                    take_profit: Number(liveTakeProfit.toFixed(6)),
                     indicator_snapshot: {
                         ...signal.indicators,
                         regime: regimeAnalysis.regime,
