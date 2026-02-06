@@ -9,11 +9,11 @@ import {
     getTrackingStats,
     DbSignal,
     getUserWeights,
-    saveUserWeights,
     getLearningHistory as getLearningHistoryFromDb,
     DbLearningCycle
 } from '@/lib/supabase';
 import { supabase } from '@/lib/supabase';
+
 
 interface TrackingStats {
     totalSignals: number;
@@ -92,11 +92,23 @@ export default function LearningPage() {
     const handleReset = async () => {
         if (!user) return;
         if (confirm('Reset all weights to defaults? This cannot be undone.')) {
-            await saveUserWeights(user.id, DEFAULT_WEIGHTS as unknown as Record<string, number>);
-            setWeights(DEFAULT_WEIGHTS);
-            loadData(); // Refresh all data
+            try {
+                const response = await fetch('/api/admin/reset-weights', {
+                    method: 'POST',
+                });
+
+                if (response.ok) {
+                    setWeights(DEFAULT_WEIGHTS);
+                    loadData(); // Refresh all data
+                } else {
+                    console.error('Failed to reset weights:', await response.text());
+                }
+            } catch (error) {
+                console.error('Error resetting weights:', error);
+            }
         }
     };
+
 
     const handleClearHistory = async () => {
         if (!user) return;
