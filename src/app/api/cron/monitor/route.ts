@@ -149,8 +149,20 @@ async function checkSignalOutcome(
     signal: DbSignal,
     currentPrice: number
 ): Promise<{ hit: boolean; outcome?: 'WON' | 'LOST'; exitReason?: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT' | 'MOMENTUM_EXIT'; profitPct?: number }> {
-    const { direction, entry_price, stop_loss, take_profit, coin } = signal;
+    const { direction, entry_price, stop_loss, take_profit, coin, created_at } = signal;
     const WIN_THRESHOLD_PCT = 3;
+
+    // SAFEGUARD: Detect impossible instant wins (>10% in <30 min)
+    // This indicates stale entry_price data - skip processing
+    const signalAge = created_at ? (Date.now() - new Date(created_at).getTime()) / 1000 / 60 : 999; // age in minutes
+    const profitPct = direction === 'LONG'
+        ? ((currentPrice - entry_price) / entry_price) * 100
+        : ((entry_price - currentPrice) / entry_price) * 100;
+
+    if (signalAge < 30 && Math.abs(profitPct) > 10) {
+        console.log(`[Monitor] BLOCKED ${coin}: Impossible ${profitPct.toFixed(1)}% in ${signalAge.toFixed(0)}m - likely stale entry price`);
+        return { hit: false }; // Don't close this signal - it has bad data
+    }
 
     if (direction === 'LONG') {
         const profitPct = ((currentPrice - entry_price) / entry_price) * 100;

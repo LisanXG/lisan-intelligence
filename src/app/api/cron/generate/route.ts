@@ -278,6 +278,23 @@ export async function GET(request: NextRequest) {
 
             // Only add if not HOLD
             if (signal.direction !== 'HOLD') {
+                // SAFEGUARD 1: Require live price - NEVER use stale candle data
+                if (!livePrice) {
+                    log.info(`BLOCKED ${coin}: No live price available - skipping to prevent stale entry`);
+                    continue;
+                }
+
+                // SAFEGUARD 2: Validate live price isn't too different from candle data
+                // If candle close and live price differ by >5%, something is wrong
+                const candleClose = ohlcv[ohlcv.length - 1]?.close;
+                if (candleClose) {
+                    const priceDiff = Math.abs((livePrice - candleClose) / candleClose) * 100;
+                    if (priceDiff > 5) {
+                        log.info(`BLOCKED ${coin}: Price mismatch - live $${livePrice.toFixed(2)} vs candle $${candleClose.toFixed(2)} (${priceDiff.toFixed(1)}% diff)`);
+                        continue;
+                    }
+                }
+
                 const confidenceLabel =
                     signal.score >= 80 ? 'HIGH' :
                         signal.score >= 60 ? 'MEDIUM' : 'LOW';
@@ -288,7 +305,7 @@ export async function GET(request: NextRequest) {
                     score: signal.score,
                     confidence: confidenceLabel,
                     // CRITICAL: Use live price, NOT stale candle close
-                    entry_price: livePrice ?? signal.entryPrice,
+                    entry_price: livePrice,
                     stop_loss: signal.stopLoss,
                     take_profit: signal.takeProfit,
                     indicator_snapshot: {
