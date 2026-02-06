@@ -65,6 +65,7 @@ export interface DbLearningCycle {
     }>;
     previous_win_rate?: number;
     consecutive_losses?: number;
+    weights_snapshot?: Record<string, number>; // Weights after this learning event
     created_at: string;
 }
 
