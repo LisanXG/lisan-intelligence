@@ -39,40 +39,6 @@ export default function FearGreedWidget() {
         return { main: '#10b981', light: 'rgba(16, 185, 129, 0.15)' };
     };
 
-    // SVG Arc calculation for semi-circle gauge
-    const createArc = (value: number) => {
-        const radius = 70;
-        const strokeWidth = 12;
-        const centerX = 80;
-        const centerY = 80;
-
-        // Semi-circle from left to right (180 degrees)
-        const startAngle = Math.PI;
-        const endAngle = 0;
-        const valueAngle = Math.PI - (value / 100) * Math.PI;
-
-        // Background arc (full semi-circle)
-        const bgStartX = centerX + radius * Math.cos(startAngle);
-        const bgStartY = centerY + radius * Math.sin(startAngle);
-        const bgEndX = centerX + radius * Math.cos(endAngle);
-        const bgEndY = centerY + radius * Math.sin(endAngle);
-
-        const bgPath = `M ${bgStartX} ${bgStartY} A ${radius} ${radius} 0 0 1 ${bgEndX} ${bgEndY}`;
-
-        // Value arc
-        const valueEndX = centerX + radius * Math.cos(valueAngle);
-        const valueEndY = centerY + radius * Math.sin(valueAngle);
-        const largeArc = value > 50 ? 1 : 0;
-
-        const valuePath = `M ${bgStartX} ${bgStartY} A ${radius} ${radius} 0 ${largeArc} 1 ${valueEndX} ${valueEndY}`;
-
-        // Needle position
-        const needleX = centerX + (radius - 10) * Math.cos(valueAngle);
-        const needleY = centerY + (radius - 10) * Math.sin(valueAngle);
-
-        return { bgPath, valuePath, needleX, needleY, centerX, centerY, strokeWidth };
-    };
-
     if (loading) {
         return (
             <div className="card p-6">
@@ -91,16 +57,23 @@ export default function FearGreedWidget() {
     }
 
     const colors = getColor(data.value);
-    const arc = createArc(data.value);
+
+    // Calculate needle rotation: 0 = -90deg (left), 100 = 90deg (right)
+    const needleRotation = -90 + (data.value / 100) * 180;
 
     return (
         <div className="card p-8">
-            <h3 className="text-xl font-semibold text-slate-700 mb-6">Fear & Greed Index</h3>
+            <h3 className="text-xl font-semibold text-slate-700 mb-6 text-center">Fear & Greed Index</h3>
 
             {/* Premium Semi-Circle Gauge */}
             <div className="flex flex-col items-center">
-                <div className="relative">
-                    <svg width="200" height="120" viewBox="0 0 160 100">
+                <div className="relative w-52 h-28">
+                    {/* SVG Gauge */}
+                    <svg
+                        viewBox="0 0 200 110"
+                        className="w-full h-full"
+                        style={{ overflow: 'visible' }}
+                    >
                         {/* Gradient definition */}
                         <defs>
                             <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -110,67 +83,63 @@ export default function FearGreedWidget() {
                                 <stop offset="75%" stopColor="#22c55e" />
                                 <stop offset="100%" stopColor="#10b981" />
                             </linearGradient>
-                            <filter id="glow">
-                                <feGaussianBlur stdDeviation="2" result="coloredBlur" />
-                                <feMerge>
-                                    <feMergeNode in="coloredBlur" />
-                                    <feMergeNode in="SourceGraphic" />
-                                </feMerge>
-                            </filter>
                         </defs>
 
-                        {/* Background track */}
+                        {/* Background arc */}
                         <path
-                            d={arc.bgPath}
+                            d="M 20 100 A 80 80 0 0 1 180 100"
                             fill="none"
                             stroke="#e2e8f0"
-                            strokeWidth={arc.strokeWidth}
+                            strokeWidth="14"
                             strokeLinecap="round"
                         />
 
-                        {/* Colored value arc */}
+                        {/* Colored arc - full gradient background */}
                         <path
-                            d={arc.valuePath}
+                            d="M 20 100 A 80 80 0 0 1 180 100"
                             fill="none"
                             stroke="url(#gaugeGradient)"
-                            strokeWidth={arc.strokeWidth}
+                            strokeWidth="14"
                             strokeLinecap="round"
-                            filter="url(#glow)"
-                            style={{
-                                transition: 'all 0.8s ease-out'
-                            }}
                         />
 
-                        {/* Needle dot */}
-                        <circle
-                            cx={arc.needleX}
-                            cy={arc.needleY}
-                            r="6"
-                            fill="white"
-                            stroke={colors.main}
-                            strokeWidth="3"
-                            filter="url(#glow)"
-                            style={{
-                                transition: 'all 0.8s ease-out'
-                            }}
-                        />
-
-                        {/* Center value display */}
-                        <text
-                            x={arc.centerX}
-                            y={arc.centerY - 5}
-                            textAnchor="middle"
-                            className="text-4xl font-bold"
-                            fill={colors.main}
+                        {/* Needle */}
+                        <g
+                            transform={`rotate(${needleRotation} 100 100)`}
+                            style={{ transition: 'transform 0.8s ease-out' }}
                         >
-                            {data.value}
-                        </text>
+                            <line
+                                x1="100"
+                                y1="100"
+                                x2="100"
+                                y2="35"
+                                stroke={colors.main}
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                            />
+                            <circle
+                                cx="100"
+                                cy="100"
+                                r="8"
+                                fill="white"
+                                stroke={colors.main}
+                                strokeWidth="3"
+                            />
+                        </g>
                     </svg>
+
+                    {/* Center value display */}
+                    <div
+                        className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-2 text-4xl font-bold"
+                        style={{ color: colors.main }}
+                    >
+                        {data.value}
+                    </div>
                 </div>
 
                 {/* Classification badge */}
                 <div
-                    className="mt-3 px-5 py-2 rounded-full text-base font-semibold"
+                    className="mt-6 px-5 py-2 rounded-full text-base font-semibold"
                     style={{
                         backgroundColor: colors.light,
                         color: colors.main
@@ -183,9 +152,9 @@ export default function FearGreedWidget() {
             </div>
 
             {/* Scale labels */}
-            <div className="flex justify-between text-sm text-slate-400 mt-6 px-2">
-                <span>Extreme Fear</span>
-                <span>Extreme Greed</span>
+            <div className="flex justify-between text-xs text-slate-400 mt-4 px-4">
+                <span>Extreme<br />Fear</span>
+                <span className="text-right">Extreme<br />Greed</span>
             </div>
         </div>
     );
