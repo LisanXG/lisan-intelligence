@@ -280,9 +280,9 @@ export async function GET(request: NextRequest) {
                     : 0;
 
                 hlContext = {
-                    fundingRate: hlAsset.fundingRate,
-                    annualizedFunding: hlAsset.annualizedFunding,
-                    openInterest: hlAsset.openInterest,
+                    fundingRate: hlAsset!.fundingRate,
+                    annualizedFunding: hlAsset!.annualizedFunding,
+                    openInterest: hlAsset!.openInterest,
                     // Note: We don't have prevOpenInterest yet - will add in Phase 3
                     priceChange,
                 };
@@ -302,9 +302,9 @@ export async function GET(request: NextRequest) {
                 // If candle close and live price differ by >5%, something is wrong
                 const candleClose = ohlcv[ohlcv.length - 1]?.close;
                 if (candleClose) {
-                    const priceDiff = Math.abs((livePrice - candleClose) / candleClose) * 100;
+                    const priceDiff = Math.abs((livePrice! - candleClose) / candleClose) * 100;
                     if (priceDiff > 5) {
-                        log.info(`BLOCKED ${coin}: Price mismatch - live $${livePrice.toFixed(2)} vs candle $${candleClose.toFixed(2)} (${priceDiff.toFixed(1)}% diff)`);
+                        log.info(`BLOCKED ${coin}: Price mismatch - live $${livePrice!.toFixed(2)} vs candle $${candleClose.toFixed(2)} (${priceDiff.toFixed(1)}% diff)`);
                         continue;
                     }
                 }
@@ -324,12 +324,12 @@ export async function GET(request: NextRequest) {
                 let liveTakeProfit: number;
 
                 if (signal.direction === 'LONG') {
-                    liveStopLoss = livePrice * (1 - (atrPercent * 1.5));
-                    liveTakeProfit = livePrice * (1 + (atrPercent * 3));
+                    liveStopLoss = livePrice! * (1 - (atrPercent * 1.5));
+                    liveTakeProfit = livePrice! * (1 + (atrPercent * 3));
                 } else {
                     // SHORT
-                    liveStopLoss = livePrice * (1 + (atrPercent * 1.5));
-                    liveTakeProfit = livePrice * (1 - (atrPercent * 3));
+                    liveStopLoss = livePrice! * (1 + (atrPercent * 1.5));
+                    liveTakeProfit = livePrice! * (1 - (atrPercent * 3));
                 }
 
                 const added = await addGlobalSignal({
@@ -338,7 +338,7 @@ export async function GET(request: NextRequest) {
                     score: signal.score,
                     confidence: confidenceLabel,
                     // CRITICAL: Use live price for entry AND recalculated SL/TP
-                    entry_price: livePrice,
+                    entry_price: livePrice!,
                     stop_loss: Number(liveStopLoss.toFixed(6)),
                     take_profit: Number(liveTakeProfit.toFixed(6)),
                     indicator_snapshot: {
