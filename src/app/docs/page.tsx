@@ -68,11 +68,11 @@ export default function DocsPage() {
                     {/* Quick Stats */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 pb-12 border-b border-slate-200">
                         <div className="text-center">
-                            <div className="text-4xl font-bold text-cyan-600 mb-2">16</div>
+                            <div className="text-4xl font-bold text-cyan-600 mb-2">15</div>
                             <div className="text-slate-500">Indicators</div>
                         </div>
                         <div className="text-center">
-                            <div className="text-4xl font-bold text-purple-600 mb-2">5</div>
+                            <div className="text-4xl font-bold text-purple-600 mb-2">6</div>
                             <div className="text-slate-500">Categories</div>
                         </div>
                         <div className="text-center">
@@ -214,7 +214,7 @@ export default function DocsPage() {
                                 </p>
                                 <p className="text-lg text-slate-600 leading-relaxed mt-3">
                                     <strong>What it is:</strong> A research tool. A decision-support system. A way to see the market through
-                                    14 different quantitative lenses at once.
+                                    15 different quantitative lenses at once.
                                 </p>
                                 <p className="text-lg text-slate-600 leading-relaxed mt-3">
                                     <strong>What it is NOT:</strong> A trading bot. An automated system that executes trades on your behalf.
@@ -235,8 +235,8 @@ export default function DocsPage() {
                                         from perpetual exchanges.
                                     </li>
                                     <li>
-                                        <strong>Indicator Calculation</strong> — Computes 16 technical indicators across 5 categories:
-                                        Momentum, Trend, Volume, Sentiment/Volatility, and Positioning. Each indicator produces a value, a signal
+                                        <strong>Indicator Calculation</strong> — Computes 15 technical indicators across 6 categories:
+                                        Momentum, Trend, Volume, Volatility, Sentiment, and Positioning. Each indicator produces a value, a signal
                                         (bullish/bearish/neutral), and a strength score (0.0 to 1.0).
                                     </li>
                                     <li>
@@ -425,30 +425,44 @@ export default function DocsPage() {
                                     </div>
                                 </div>
 
-                                {/* Sentiment & Volatility */}
+                                {/* Volatility */}
                                 <div>
-                                    <h4 className="text-xl font-semibold text-emerald-700 mb-4 flex items-center gap-3">
-                                        <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
-                                        Sentiment & Volatility (24 points)
+                                    <h4 className="text-xl font-semibold text-amber-700 mb-4 flex items-center gap-3">
+                                        <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+                                        Volatility Cluster (16 points)
                                     </h4>
                                     <p className="text-slate-600 mb-4">
-                                        The market is people. And people are emotional. These indicators measure fear, greed,
-                                        and statistical extremes.
+                                        Statistical measure of price deviation from the norm. Mean reversion is a powerful force —
+                                        extreme moves tend to snap back.
                                     </p>
                                     <div className="bg-slate-50 rounded-lg p-4 space-y-4">
-                                        <div>
-                                            <p className="font-semibold text-slate-700">Fear & Greed Index (8 pts)</p>
-                                            <p className="text-slate-600">
-                                                Aggregated market sentiment from multiple sources. Below 25 = Extreme Fear (historically a buying opportunity —
-                                                &quot;be greedy when others are fearful&quot;). Above 75 = Extreme Greed (historically time to be cautious —
-                                                &quot;be fearful when others are greedy&quot;). This is a contrarian indicator.
-                                            </p>
-                                        </div>
                                         <div>
                                             <p className="font-semibold text-slate-700">Z-Score (16 pts)</p>
                                             <p className="text-slate-600">
                                                 Statistical measure of how far price has deviated from the mean. Below -2 = price is 2+ standard deviations
                                                 below average (statistically oversold). Above +2 = statistically overbought. Mean reversion is a powerful force.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Sentiment */}
+                                <div>
+                                    <h4 className="text-xl font-semibold text-emerald-700 mb-4 flex items-center gap-3">
+                                        <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
+                                        Sentiment Cluster (8 points)
+                                    </h4>
+                                    <p className="text-slate-600 mb-4">
+                                        The market is people. And people are emotional. This contrarian indicator measures
+                                        crowd psychology extremes.
+                                    </p>
+                                    <div className="bg-slate-50 rounded-lg p-4 space-y-4">
+                                        <div>
+                                            <p className="font-semibold text-slate-700">Fear &amp; Greed Index (8 pts)</p>
+                                            <p className="text-slate-600">
+                                                Aggregated market sentiment from multiple sources. Below 25 = Extreme Fear (historically a buying opportunity —
+                                                &quot;be greedy when others are fearful&quot;). Above 75 = Extreme Greed (historically time to be cautious —
+                                                &quot;be fearful when others are greedy&quot;). This is a contrarian indicator.
                                             </p>
                                         </div>
                                     </div>
@@ -641,6 +655,74 @@ export default function DocsPage() {
                                 </ul>
                                 <p className="text-slate-600 mt-3">
                                     This prevents extreme drift. The system adapts, but within sane boundaries.
+                                </p>
+                            </div>
+
+                            <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4 mt-6">
+                                <p className="font-semibold text-cyan-800 mb-2">Weight Recovery — Gradual Return to Defaults</p>
+                                <p className="text-slate-600 mb-3">
+                                    Penalized weights don&apos;t stay penalized forever. After 20 trades where an indicator
+                                    does NOT appear in losing signals, we recover 5% of the gap toward its default weight.
+                                </p>
+                                <p className="text-slate-600">
+                                    This prevents permanent over-penalization of temporarily unlucky indicators and ensures the system
+                                    doesn&apos;t drift too far from proven defaults during unusual market conditions.
+                                </p>
+                            </div>
+                        </Accordion>
+
+                        <Accordion title="Market Regime Detection — NEW">
+                            <p className="mb-6">
+                                Markets don&apos;t behave the same way all the time. A strategy that works in a bull trend
+                                fails in choppy consolidation. The engine now detects the current market regime and adjusts accordingly.
+                            </p>
+
+                            <div className="overflow-x-auto mb-6">
+                                <table className="w-full text-left">
+                                    <thead>
+                                        <tr className="border-b-2 border-slate-200">
+                                            <th className="py-4 pr-4 font-bold text-slate-800">Regime</th>
+                                            <th className="py-4 font-bold text-slate-800">Characteristics</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="text-slate-600">
+                                        <tr className="border-b border-slate-100">
+                                            <td className="py-4 pr-4 font-semibold text-emerald-600">BULL_TREND</td>
+                                            <td className="py-4">Strong uptrend, high ADX, positive RSI momentum. Trust trend indicators.</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-100">
+                                            <td className="py-4 pr-4 font-semibold text-red-600">BEAR_TREND</td>
+                                            <td className="py-4">Strong downtrend, high ADX, negative momentum. Short bias active.</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-100">
+                                            <td className="py-4 pr-4 font-semibold text-amber-600">HIGH_VOL_CHOP</td>
+                                            <td className="py-4">Sideways with large swings, low ADX, high ATR. Stricter entry requirements.</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-100">
+                                            <td className="py-4 pr-4 font-semibold text-cyan-600">RECOVERY_PUMP</td>
+                                            <td className="py-4">Sharp reversal after dump, decreasing OI. Momentum plays favored.</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-100">
+                                            <td className="py-4 pr-4 font-semibold text-purple-600">DISTRIBUTION</td>
+                                            <td className="py-4">Rising prices with declining OI and divergence. Caution at tops.</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-100">
+                                            <td className="py-4 pr-4 font-semibold text-blue-600">ACCUMULATION</td>
+                                            <td className="py-4">Falling prices with accumulation signs, extreme negative funding.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="bg-slate-50 rounded-lg p-4">
+                                <p className="font-semibold text-slate-700 mb-2">How Regime Affects Signals</p>
+                                <ul className="space-y-1 text-slate-600">
+                                    <li><strong>Entry Strictness</strong> — Stricter in chop (+30%), looser in clear trends (-10%)</li>
+                                    <li><strong>Indicator Weights</strong> — Trend indicators weighted higher in trends, momentum in reversals</li>
+                                    <li><strong>Direction Bias</strong> — Subtle preference for longs in bull, shorts in bear</li>
+                                </ul>
+                                <p className="text-slate-600 mt-3">
+                                    Regime is stored with each signal&apos;s indicator snapshot for future analysis.
                                 </p>
                             </div>
                         </Accordion>
@@ -984,7 +1066,7 @@ export default function DocsPage() {
 
                     {/* Version */}
                     <div className="mt-8 text-center text-slate-400">
-                        <p>Version 3.1.16 — February 2026 — Admin Governance & Signal Fidelity — LISAN HOLDINGS</p>
+                        <p>Version 4.0.0 — February 2026 — Institutional Alpha: Regime Detection & Context-Aware Learning — LISAN HOLDINGS</p>
                     </div>
                 </div>
             </main>

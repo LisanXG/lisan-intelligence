@@ -60,8 +60,14 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
 
 
     // Track signals to Supabase
+    // Kill switch: set NEXT_PUBLIC_SIGNAL_TRACKING_ENABLED=false to disable
     const trackSignals = useCallback(async (newSignals: EngineSignal[]) => {
         if (!user) return;
+
+        // Kill switch - disable all client-side signal insertion
+        if (process.env.NEXT_PUBLIC_SIGNAL_TRACKING_ENABLED !== 'true') {
+            return;
+        }
 
         try {
             // Get current open signals from Supabase
