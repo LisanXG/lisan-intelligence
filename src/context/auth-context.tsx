@@ -14,6 +14,7 @@ interface AuthContextType {
     user: User | null;
     session: Session | null;
     loading: boolean;
+    isAdmin: boolean; // True if user email matches ADMIN_EMAIL env var
     signIn: (email: string, password: string) => Promise<{ error: Error | null; data: { user: User | null; session: Session | null } | null }>;
     signUp: (email: string, password: string) => Promise<{ error: Error | null; data: { user: User | null; session: Session | null } | null }>;
     signOut: () => Promise<void>;
@@ -79,10 +80,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(null);
     }, []);
 
+    // Admin check - compare user email to ADMIN_EMAIL env var
+    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL?.toLowerCase();
+    const isAdmin = Boolean(user?.email && adminEmail && user.email.toLowerCase() === adminEmail);
+
     const value = {
         user,
         session,
         loading,
+        isAdmin,
         signIn,
         signUp,
         signOut,
