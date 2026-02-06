@@ -874,8 +874,7 @@ export default function DocsPage() {
                                     localStorage is convenient for prototypes, but it has real problems:
                                     data gets wiped when you clear browser cache, it doesn&apos;t sync across devices,
                                     and there&apos;s no way to analyze aggregate performance. Moving to a database
-                                    solves all of these while enabling future features like public leaderboards
-                                    and cross-device sync.
+                                    solves all of these while enabling cross-device sync and collective learning.
                                 </p>
                             </div>
                         </Accordion>
@@ -965,7 +964,7 @@ export default function DocsPage() {
 
                     {/* Version */}
                     <div className="mt-8 text-center text-slate-400">
-                        <p>Version 3.1.0 — February 2026 — Smart Exit Strategy — LISAN HOLDINGS</p>
+                        <p>Version 3.1.16 — February 2026 — Admin Governance & Signal Fidelity — LISAN HOLDINGS</p>
                     </div>
                 </div>
             </main>
