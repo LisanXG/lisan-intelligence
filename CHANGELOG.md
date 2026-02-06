@@ -5,6 +5,30 @@ All notable changes to LISAN INTELLIGENCE will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-02-06
+
+### Added
+- **Engine v4.0** — Major overhaul of the signal generation and learning systems
+- **Hyperliquid-Primary Data** — HL perpetuals now primary data source with Binance fallback
+- **Funding Rate Indicator** — New indicator from Hyperliquid funding data
+- **Open Interest Indicator** — Tracks OI changes for sentiment analysis
+- **Market Regime Detection** — Classifies market as BULLISH/BEARISH/NEUTRAL/VOLATILE
+- **Context-Aware Learning** — Direction-specific weight tracking (LONG vs SHORT performance)
+- **Trailing Win Rate** — Proactive monitoring of recent performance windows
+- **Weight Recovery** — Penalized indicators gradually recover after proving stability
+- **Live Price Safeguards** — Blocks stale entry prices to prevent fake instant wins
+
+### Changed
+- Replaced DOGE with TON in curated 20 assets (stability improvement)
+- Raised signal score threshold from 35 → 50 (quality over quantity)
+- Reduced Fear & Greed weight from 15 → 8 (less sentiment dependency)
+- Entry prices now use live Hyperliquid mark price (not candle close)
+
+### Fixed
+- ADX penalty bug in learning system
+- Stale entry price bug causing 0-minute impossible winners
+- Signals blocked if live price unavailable or differs >5% from candle
+
 ## [3.1.16] - 2026-02-06
 
 ### Added
