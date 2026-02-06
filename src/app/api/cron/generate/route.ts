@@ -178,20 +178,6 @@ export async function GET(request: NextRequest) {
     const log = logger.withContext('CronGenerate');
     const startTime = Date.now();
 
-    // ============================================================================
-    // EMERGENCY KILL SWITCH - SIGNAL GENERATION DISABLED
-    // Reason: Stale price bug causing fake wins - need to debug before re-enabling
-    // To re-enable: Remove or comment out this block after root cause is fixed
-    // ============================================================================
-    log.info('EMERGENCY: Signal generation is DISABLED - stale price investigation in progress');
-    return NextResponse.json({
-        success: true,
-        message: 'Signal generation temporarily disabled for debugging',
-        disabled: true,
-        duration: Date.now() - startTime,
-    });
-    // ============================================================================
-
     try {
         // 1. Get all pending signals (global)
         const pending = await getAllPendingSignals();
