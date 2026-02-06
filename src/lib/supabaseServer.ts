@@ -228,6 +228,7 @@ export async function getLastLearnedSignalId(): Promise<string | null> {
 export async function findUnprocessedLossStreak(): Promise<{
     count: number;
     signalIds: string[];
+    streakEndTime: string | null;  // Timestamp of the 3rd loss for chart positioning
 }> {
     // Get all completed signals ordered by close time
     const { data, error } = await supabaseServer
@@ -237,7 +238,7 @@ export async function findUnprocessedLossStreak(): Promise<{
         .order('closed_at', { ascending: true }); // Oldest first
 
     if (error || !data || data.length === 0) {
-        return { count: 0, signalIds: [] };
+        return { count: 0, signalIds: [], streakEndTime: null };
     }
 
     // Get the timestamp of the last learning event
@@ -267,6 +268,7 @@ export async function findUnprocessedLossStreak(): Promise<{
                 return {
                     count: currentStreak.length,
                     signalIds: currentStreak.map(s => s.id),
+                    streakEndTime: currentStreak[2].closedAt, // 3rd loss timestamp
                 };
             }
             // Not enough losses - reset and keep looking
@@ -279,10 +281,11 @@ export async function findUnprocessedLossStreak(): Promise<{
         return {
             count: currentStreak.length,
             signalIds: currentStreak.map(s => s.id),
+            streakEndTime: currentStreak[2].closedAt, // 3rd loss timestamp
         };
     }
 
-    return { count: 0, signalIds: [] };
+    return { count: 0, signalIds: [], streakEndTime: null };
 }
 
 

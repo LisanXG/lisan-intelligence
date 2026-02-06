@@ -223,6 +223,11 @@ async function runGlobalLearningCycle(): Promise<{
         // Update global weights
         await updateGlobalWeights(currentWeights as unknown as Record<string, number>);
 
+        // Calculate the learning event timestamp: 100ms after the 3rd loss
+        const learningEventTime = lossStreak.streakEndTime
+            ? new Date(new Date(lossStreak.streakEndTime).getTime() + 100).toISOString()
+            : new Date().toISOString();
+
         // Record learning cycle (global, no user_id)
         await supabaseServer.from('learning_cycles').insert({
             user_id: null, // Global learning
@@ -230,6 +235,7 @@ async function runGlobalLearningCycle(): Promise<{
             signals_analyzed: losingSignals.length,
             adjustments,
             consecutive_losses: consecutiveLosses,
+            created_at: learningEventTime, // Position at streak occurrence, not now
         });
     }
 
@@ -257,37 +263,47 @@ export async function GET(request: NextRequest) {
     const startTime = Date.now();
 
     try {
-        log.debug('Running global learning cycle');
+        log.debug('Running global learning cycle (multi-streak mode)');
 
-        const result = await runGlobalLearningCycle();
+        // Loop to process ALL unprocessed loss streaks in one run
+        const allResults: { consecutiveLosses: number; adjustments: WeightAdjustment[] }[] = [];
+        let totalAdjustments = 0;
+        const MAX_ITERATIONS = 10; // Safety limit
 
-        if (!result.triggered) {
-            return NextResponse.json({
-                success: true,
-                message: `Only ${result.consecutiveLosses} consecutive losses (need ${LEARNING_CONFIG.consecutiveLossThreshold})`,
-                learningTriggered: false,
-                duration: Date.now() - startTime,
-            });
-        }
+        for (let i = 0; i < MAX_ITERATIONS; i++) {
+            const result = await runGlobalLearningCycle();
 
-        if (result.adjustments.length === 0) {
-            return NextResponse.json({
-                success: true,
-                message: 'Learning triggered but no adjustments needed',
-                learningTriggered: true,
+            if (!result.triggered) {
+                log.debug(`Iteration ${i + 1}: No more streaks found`);
+                break;
+            }
+
+            allResults.push({
                 consecutiveLosses: result.consecutiveLosses,
+                adjustments: result.adjustments,
+            });
+            totalAdjustments += result.adjustments.length;
+            log.debug(`Iteration ${i + 1}: Processed streak of ${result.consecutiveLosses} with ${result.adjustments.length} adjustments`);
+        }
+
+        if (allResults.length === 0) {
+            return NextResponse.json({
+                success: true,
+                message: 'No loss streaks found to process',
+                learningTriggered: false,
+                streaksProcessed: 0,
                 duration: Date.now() - startTime,
             });
         }
 
-        log.info(`Learning cycle completed with ${result.adjustments.length} weight adjustments`);
+        log.info(`Learning complete: ${allResults.length} streaks processed, ${totalAdjustments} total adjustments`);
 
         return NextResponse.json({
             success: true,
             learningTriggered: true,
-            consecutiveLosses: result.consecutiveLosses,
-            adjustmentsCount: result.adjustments.length,
-            adjustments: result.adjustments,
+            streaksProcessed: allResults.length,
+            totalAdjustments,
+            results: allResults,
             duration: Date.now() - startTime,
         });
 
