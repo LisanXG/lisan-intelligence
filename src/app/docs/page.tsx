@@ -291,7 +291,7 @@ export default function DocsPage() {
                             </div>
                         </Accordion>
 
-                        <Accordion title="The 16 Indicators — Complete Breakdown">
+                        <Accordion title="The 15 Indicators — Complete Breakdown">
                             <p className="mb-6">
                                 Every indicator in the engine outputs three things:
                             </p>
@@ -401,7 +401,7 @@ export default function DocsPage() {
                                 <div>
                                     <h4 className="text-xl font-semibold text-blue-700 mb-4 flex items-center gap-3">
                                         <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                                        Volume Cluster (20 points)
+                                        Volume Cluster (16 points)
                                     </h4>
                                     <p className="text-slate-600 mb-4">
                                         Volume is the fuel for price movement. A breakout without volume is suspect.
@@ -416,7 +416,7 @@ export default function DocsPage() {
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="font-semibold text-slate-700">Volume Ratio (10 pts)</p>
+                                            <p className="font-semibold text-slate-700">Volume Ratio (6 pts)</p>
                                             <p className="text-slate-600">
                                                 Current volume relative to the 20-period average. Above 1.5x = significant volume, high conviction move.
                                                 We don&apos;t trust breakouts that happen on average or below-average volume.
@@ -492,7 +492,7 @@ export default function DocsPage() {
                             </p>
 
                             <div className="bg-slate-900 rounded-lg p-6 font-mono text-slate-300 mb-6 overflow-x-auto text-sm md:text-base">
-                                <div className="text-slate-500 mb-3">// For each of the 16 indicators:</div>
+                                <div className="text-slate-500 mb-3">// For each of the 15 indicators:</div>
                                 <div className="mb-4">
                                     <div>points = weight × strength</div>
                                     <div className="mt-2">if (signal === &apos;bullish&apos;) totalBullish += points</div>
@@ -506,9 +506,9 @@ export default function DocsPage() {
                                 </div>
                                 <div className="text-slate-500 mb-3">// Classification:</div>
                                 <div>
-                                    <div>if (directionalBias &gt; totalScore × 0.10 AND normalizedScore &gt;= 50)</div>
+                                    <div>if (directionalBias &gt; maxPossible × 0.10 AND normalizedScore &gt;= 50)</div>
                                     <div className="ml-4">direction = <span className="text-emerald-400">LONG</span></div>
-                                    <div className="mt-2">else if (directionalBias &lt; -totalScore × 0.10 AND normalizedScore &gt;= 50)</div>
+                                    <div className="mt-2">else if (directionalBias &lt; -maxPossible × 0.10 AND normalizedScore &gt;= 50)</div>
                                     <div className="ml-4">direction = <span className="text-red-400">SHORT</span></div>
                                     <div className="mt-2">else</div>
                                     <div className="ml-4">direction = <span className="text-slate-400">HOLD</span></div>
