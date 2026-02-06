@@ -68,11 +68,11 @@ export default function DocsPage() {
                     {/* Quick Stats */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 pb-12 border-b border-slate-200">
                         <div className="text-center">
-                            <div className="text-4xl font-bold text-cyan-600 mb-2">14</div>
+                            <div className="text-4xl font-bold text-cyan-600 mb-2">16</div>
                             <div className="text-slate-500">Indicators</div>
                         </div>
                         <div className="text-center">
-                            <div className="text-4xl font-bold text-purple-600 mb-2">4</div>
+                            <div className="text-4xl font-bold text-purple-600 mb-2">5</div>
                             <div className="text-slate-500">Categories</div>
                         </div>
                         <div className="text-center">
@@ -235,8 +235,8 @@ export default function DocsPage() {
                                         from perpetual exchanges.
                                     </li>
                                     <li>
-                                        <strong>Indicator Calculation</strong> — Computes 14 technical indicators across 4 categories:
-                                        Momentum, Trend, Volume, and Sentiment/Volatility. Each indicator produces a value, a signal
+                                        <strong>Indicator Calculation</strong> — Computes 16 technical indicators across 5 categories:
+                                        Momentum, Trend, Volume, Sentiment/Volatility, and Positioning. Each indicator produces a value, a signal
                                         (bullish/bearish/neutral), and a strength score (0.0 to 1.0).
                                     </li>
                                     <li>
@@ -486,9 +486,9 @@ export default function DocsPage() {
                                 </div>
                                 <div className="text-slate-500 mb-3">// Classification:</div>
                                 <div>
-                                    <div>if (directionalBias &gt; totalScore × 0.10 AND normalizedScore &gt;= 35)</div>
+                                    <div>if (directionalBias &gt; totalScore × 0.10 AND normalizedScore &gt;= 50)</div>
                                     <div className="ml-4">direction = <span className="text-emerald-400">LONG</span></div>
-                                    <div className="mt-2">else if (directionalBias &lt; -totalScore × 0.10 AND normalizedScore &gt;= 35)</div>
+                                    <div className="mt-2">else if (directionalBias &lt; -totalScore × 0.10 AND normalizedScore &gt;= 50)</div>
                                     <div className="ml-4">direction = <span className="text-red-400">SHORT</span></div>
                                     <div className="mt-2">else</div>
                                     <div className="ml-4">direction = <span className="text-slate-400">HOLD</span></div>
@@ -505,11 +505,11 @@ export default function DocsPage() {
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="font-semibold text-slate-700">Why 35 minimum score?</p>
+                                    <p className="font-semibold text-slate-700">Why 50 minimum score?</p>
                                     <p className="text-slate-600">
-                                        A score below 35 means most indicators are neutral or weak.
-                                        Even if there&apos;s a directional bias, there&apos;s no confluence.
-                                        We don&apos;t trade on weak setups.
+                                        A score below 50 means most indicators are neutral or weak.
+                                        Even if there&apos;s a directional bias, there&apos;s no strong confluence.
+                                        We don&apos;t trade on weak setups — quality over quantity.
                                     </p>
                                 </div>
                             </div>
@@ -679,13 +679,13 @@ export default function DocsPage() {
                                     <tbody className="text-slate-600">
                                         <tr className="border-b border-slate-100">
                                             <td className="py-4 pr-4">OHLCV Price Data</td>
-                                            <td className="py-4 pr-4">Binance Public API (no auth required)</td>
+                                            <td className="py-4 pr-4">Hyperliquid Candle API (primary), Binance (fallback)</td>
                                             <td className="py-4">5 minutes</td>
                                         </tr>
                                         <tr className="border-b border-slate-100">
-                                            <td className="py-4 pr-4">HYPE Token Data</td>
-                                            <td className="py-4 pr-4">Hyperliquid Candle API</td>
-                                            <td className="py-4">5 minutes</td>
+                                            <td className="py-4 pr-4">Live Entry Prices</td>
+                                            <td className="py-4 pr-4">Hyperliquid Mark Prices (metaAndAssetCtxs)</td>
+                                            <td className="py-4">Real-time</td>
                                         </tr>
                                         <tr className="border-b border-slate-100">
                                             <td className="py-4 pr-4">Fear &amp; Greed Index</td>
