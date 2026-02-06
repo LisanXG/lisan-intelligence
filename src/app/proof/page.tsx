@@ -100,6 +100,15 @@ export default function ProofPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Smart price formatting - more decimals for cheap coins
+    const formatPrice = (price: number | null | undefined): string => {
+        if (price === null || price === undefined) return '-';
+        if (price >= 1000) return `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+        if (price >= 1) return `$${price.toFixed(2)}`;
+        if (price >= 0.01) return `$${price.toFixed(4)}`;
+        return `$${price.toFixed(6)}`;
+    };
+
     useEffect(() => {
         async function loadStats() {
             try {
@@ -308,8 +317,8 @@ export default function ProofPage() {
                                                 </span>
                                             </td>
                                             <td className="py-3 px-2 text-center">{outcome.score}</td>
-                                            <td className="py-3 px-2 text-right font-mono text-xs">${outcome.entry_price?.toLocaleString()}</td>
-                                            <td className="py-3 px-2 text-right font-mono text-xs">${outcome.exit_price?.toLocaleString() || '-'}</td>
+                                            <td className="py-3 px-2 text-right font-mono text-xs">{formatPrice(outcome.entry_price)}</td>
+                                            <td className="py-3 px-2 text-right font-mono text-xs">{formatPrice(outcome.exit_price)}</td>
                                             <td className={`py-3 px-2 text-right font-mono text-xs ${(outcome.profit_pct || 0) >= 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'
                                                 }`}>
                                                 {(outcome.profit_pct || 0) >= 0 ? '+' : ''}{outcome.profit_pct?.toFixed(2) || '0'}%
@@ -433,6 +442,15 @@ function CumulativeChart({ returns, learningEvents }: { returns: CumulativeRetur
             </div>
         );
     }
+
+    // Smart price formatting for cheap coins
+    const formatChartPrice = (price: number | undefined): string => {
+        if (!price) return '-';
+        if (price >= 1000) return `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+        if (price >= 1) return `$${price.toFixed(2)}`;
+        if (price >= 0.01) return `$${price.toFixed(4)}`;
+        return `$${price.toFixed(6)}`;
+    };
 
     // Chart dimensions
     const chartHeight = 280;
@@ -601,8 +619,8 @@ function CumulativeChart({ returns, learningEvents }: { returns: CumulativeRetur
                             </div>
                             {/* Row 2: Entry, Exit, Duration, Date */}
                             <div className="flex items-center gap-4 text-xs text-slate-400">
-                                <span>Entry: <span className="font-mono text-slate-300">${hoveredPoint.data.entryPrice?.toLocaleString()}</span></span>
-                                <span>Exit: <span className="font-mono text-slate-300">${hoveredPoint.data.exitPrice?.toLocaleString()}</span></span>
+                                <span>Entry: <span className="font-mono text-slate-300">{formatChartPrice(hoveredPoint.data.entryPrice)}</span></span>
+                                <span>Exit: <span className="font-mono text-slate-300">{formatChartPrice(hoveredPoint.data.exitPrice)}</span></span>
                                 <span>Duration: <span className="text-slate-300">{formatDuration(hoveredPoint.data.durationHours)}</span></span>
                                 <span className="text-slate-500">{formatDate(hoveredPoint.data.closedAt)}</span>
                             </div>
