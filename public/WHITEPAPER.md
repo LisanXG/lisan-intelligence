@@ -333,4 +333,4 @@ Do your own research. Use this as one input among many. And for the love of god,
 
 ---
 
-*Version 3.1.0 — February 2026 — Smart Exit Strategy — LISAN HOLDINGS*
+*Version 3.1.16 — February 2026 — Admin Governance & Signal Fidelity — LISAN HOLDINGS*

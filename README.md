@@ -36,9 +36,9 @@ LISAN INTELLIGENCE is a research tool that analyzes cryptocurrency markets using
 
 ## Tech Stack
 
-- **Framework:** Next.js 14 (App Router)
+- **Framework:** Next.js 16 (App Router)
 - **Language:** TypeScript
-- **Styling:** Tailwind CSS
+- **Styling:** Tailwind CSS 4
 - **Database:** Supabase (PostgreSQL + Auth)
 - **Data Sources:** Binance API, Hyperliquid API, Alternative.me
 - **Deployment:** Vercel

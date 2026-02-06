@@ -5,6 +5,25 @@ All notable changes to LISAN INTELLIGENCE will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.16] - 2026-02-06
+
+### Added
+- **Admin Governance** — Destructive operations (Reset/Clear) restricted to authorized administrators via RBAC
+- **Signal Fidelity Hardening** — PostgreSQL partial unique index prevents duplicate pending signals
+- **Positive Outcome Guards** — Enforces profit validation for WON outcomes
+- **Smart Exit Strategy** — Momentum re-evaluation at +3% profit to run winners to full ATR TP
+- **Autonomous Learning Pipeline** — Hourly weight adaptation on 3+ consecutive loss streaks
+
+### Changed
+- Upgraded to Next.js 16 and React 19
+- Server-side cron is now sole authority for signal exits (removed client-side race condition)
+- Learning events now positioned at exact streak timestamp for chart accuracy
+
+### Fixed
+- Take profit polarity validation for SHORT signals
+- Display precision for sub-$1 assets (dynamic decimals up to 6)
+- Deduplication race conditions during high-frequency volatility
+
 ## [0.3.0] - 2026-02-01
 
 ### Added
