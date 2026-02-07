@@ -526,18 +526,18 @@ export default function DocsPage() {
                                     <div className="mt-2">if (signal === &apos;bullish&apos;) totalBullish += points</div>
                                     <div>if (signal === &apos;bearish&apos;) totalBearish += points</div>
                                 </div>
-                                <div className="text-slate-500 mb-3">// v4.1: Cluster agreement penalizes contradictory signals</div>
+                                <div className="text-slate-500 mb-3">// v4.1: Cluster agreement tracked for visibility (not a score multiplier)</div>
                                 <div className="mb-4">
-                                    <div>agreement = agreementRatio(bullishCount, bearishCount)</div>
-                                    <div>normalizedScore = (totalScore / maxPossible) × 100 × agreement</div>
+                                    <div>agreement = agreementRatio(bullishCount, bearishCount)  // 0.3–1.0</div>
+                                    <div>normalizedScore = (totalScore / maxPossible) × 100</div>
                                 </div>
                                 <div className="text-slate-500 mb-3">// Classification (v4.1: threshold adapts to market regime):</div>
                                 <div>
-                                    <div>scoreThreshold = 50 × regimeMultiplier</div>
-                                    <div className="ml-4 text-slate-500">// e.g. 45 in bull trend, 65 in choppy markets</div>
-                                    <div className="mt-2">if (directionalBias &gt; maxPossible × 0.15 AND normalizedScore &gt;= scoreThreshold)</div>
+                                    <div>scoreThreshold = 25 × regimeMultiplier</div>
+                                    <div className="ml-4 text-slate-500">// e.g. 23 in bull trend, 33 in choppy markets</div>
+                                    <div className="mt-2">if (directionalBias &gt; maxPossible × 0.05 AND normalizedScore &gt;= scoreThreshold)</div>
                                     <div className="ml-4">direction = <span className="text-emerald-400">LONG</span></div>
-                                    <div className="mt-2">else if (directionalBias &lt; -maxPossible × 0.15 AND normalizedScore &gt;= scoreThreshold)</div>
+                                    <div className="mt-2">else if (directionalBias &lt; -maxPossible × 0.05 AND normalizedScore &gt;= scoreThreshold)</div>
                                     <div className="ml-4">direction = <span className="text-red-400">SHORT</span></div>
                                     <div className="mt-2">else</div>
                                     <div className="ml-4">direction = <span className="text-slate-400">HOLD</span></div>
@@ -546,19 +546,19 @@ export default function DocsPage() {
 
                             <div className="space-y-4 mb-6">
                                 <div>
-                                    <p className="font-semibold text-slate-700">Why 15% directional bias threshold?</p>
+                                    <p className="font-semibold text-slate-700">Why 5% directional bias threshold?</p>
                                     <p className="text-slate-600">
-                                        v4.1 raised this from 10% to 15%. Because 55% bullish vs 45% bearish isn&apos;t conviction —
-                                        it&apos;s noise. We require a clear directional edge before emitting a LONG or SHORT signal.
-                                        If the indicators are split, that&apos;s a HOLD.
+                                        The engine requires at least 5% net directional bias (bullish minus bearish points
+                                        as a fraction of the total possible) before emitting a LONG or SHORT signal.
+                                        If indicators are evenly split, that&apos;s a HOLD — no edge, no trade.
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="font-semibold text-slate-700">Why ~50 minimum score?</p>
+                                    <p className="font-semibold text-slate-700">Why 25 minimum score?</p>
                                     <p className="text-slate-600">
-                                        The base threshold is 50, meaning most indicators must show at least moderate alignment.
-                                        In v4.1, market regime detection adjusts this: in choppy markets (HIGH_VOL_CHOP) it rises to ~65
-                                        to filter noise, while in clear trends (BULL_TREND / BEAR_TREND) it drops to ~45
+                                        The base threshold is 25, meaning a reasonable portion of indicators must show alignment.
+                                        In v4.1, market regime detection adjusts this: in choppy markets (HIGH_VOL_CHOP) it rises to ~33
+                                        to filter noise, while in clear trends (BULL_TREND / BEAR_TREND) it drops to ~23
                                         to capture higher-probability setups earlier. Quality over quantity, adapted to conditions.
                                     </p>
                                 </div>

@@ -72,7 +72,7 @@ export default function ShareableCard({ signal }: ShareableCardProps) {
                             marginBottom: '6px',
                         }}>
                             LISAN SIGNAL
-                        </div>
+                        </div>-
                         <div style={{
                             fontSize: '30px',
                             fontWeight: '800',
@@ -195,9 +195,9 @@ export default function ShareableCard({ signal }: ShareableCardProps) {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    padding: '10px 16px',
+                    padding: '12px 16px',
                     borderRadius: '10px',
-                    background: `linear-gradient(90deg, rgba(6,182,212,0.08), rgba(139,92,246,0.08))`,
+                    background: 'rgba(6,182,212,0.08)',
                     border: '1px solid rgba(6,182,212,0.12)',
                     marginBottom: '20px',
                 }}>
@@ -205,10 +205,8 @@ export default function ShareableCard({ signal }: ShareableCardProps) {
                     <span style={{
                         fontSize: '18px',
                         fontWeight: '800',
-                        background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
+                        color: '#22d3ee',
+                        letterSpacing: '-0.02em',
                     }}>
                         1:{signal.riskRewardRatio.toFixed(1)}
                     </span>
@@ -222,25 +220,26 @@ export default function ShareableCard({ signal }: ShareableCardProps) {
                     paddingTop: '16px',
                     borderTop: '1px solid rgba(255,255,255,0.06)',
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {/* Logo mark */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {/* Official Logo SVG */}
                         <div style={{
                             width: '28px',
                             height: '28px',
-                            borderRadius: '8px',
-                            background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)',
+                            borderRadius: '7px',
+                            background: '#1e293b',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: '14px',
-                            fontWeight: '900',
-                            color: '#fff',
+                            flexShrink: 0,
                         }}>
-                            L
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#94a3b8" strokeWidth="2.5">
+                                <path d="M6 4v16M6 20h12" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M10 8h8M10 12h6" strokeLinecap="round" strokeOpacity="0.6" />
+                            </svg>
                         </div>
                         <div>
-                            <div style={{ fontSize: '13px', fontWeight: '700', color: '#e2e8f0', letterSpacing: '0.03em' }}>LISAN INTELLIGENCE</div>
-                            <div style={{ fontSize: '10px', color: '#64748b' }}>lisanintel.com</div>
+                            <div style={{ fontSize: '13px', fontWeight: '700', color: '#e2e8f0', letterSpacing: '0.03em', lineHeight: 1.2 }}>LISAN INTELLIGENCE</div>
+                            <div style={{ fontSize: '10px', color: '#64748b', lineHeight: 1.2 }}>lisanintel.com</div>
                         </div>
                     </div>
                     <div style={{
