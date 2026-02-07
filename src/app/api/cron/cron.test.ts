@@ -234,7 +234,7 @@ describe('Cron Route Response Structure', () => {
             ]);
             // All 20 CURATED_ASSETS minus the 3 pending above = 17 in cooldown
             (getRecentlyClosedCoins as ReturnType<typeof vi.fn>).mockResolvedValue([
-                'AVAX', 'LINK', 'TON', 'XRP', 'ADA', 'DOT', 'MATIC',
+                'AVAX', 'LINK', 'TON', 'XRP', 'ADA', 'DOT', 'POL',
                 'UNI', 'ATOM', 'LTC', 'NEAR', 'ARB', 'OP', 'APT',
                 'SUI', 'HYPE', 'INJ'
             ]);

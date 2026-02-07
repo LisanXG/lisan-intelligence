@@ -4,11 +4,6 @@ import { CURATED_ASSETS, COIN_METADATA } from '@/lib/constants/assets';
 // Derive tracked coins from single source of truth
 const TRACKED_COINS = CURATED_ASSETS.map(s => COIN_METADATA[s].coingeckoId);
 
-// Symbol to CoinGecko ID mapping derived from COIN_METADATA
-const SYMBOL_TO_ID: Record<string, string> = Object.fromEntries(
-    CURATED_ASSETS.map(s => [s.toLowerCase(), COIN_METADATA[s].coingeckoId])
-);
-
 // Server-side API route - fetches from CoinGecko (only shows tracked coins)
 export async function GET() {
     try {

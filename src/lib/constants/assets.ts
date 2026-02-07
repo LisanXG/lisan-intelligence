@@ -19,7 +19,7 @@ export const CURATED_ASSETS = [
     'XRP',   // Ripple
     'ADA',   // Cardano
     'DOT',   // Polkadot
-    'MATIC', // Polygon
+    'POL',   // Polygon (ex-MATIC)
     'UNI',   // Uniswap
     'ATOM',  // Cosmos
     'LTC',   // Litecoin
@@ -60,7 +60,7 @@ export const COIN_METADATA: Record<CuratedAsset, CoinMeta> = {
     XRP: { symbol: 'XRP', name: 'XRP', image: 'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png', coingeckoId: 'ripple' },
     ADA: { symbol: 'ADA', name: 'Cardano', image: 'https://assets.coingecko.com/coins/images/975/small/cardano.png', coingeckoId: 'cardano' },
     DOT: { symbol: 'DOT', name: 'Polkadot', image: 'https://assets.coingecko.com/coins/images/12171/small/polkadot.png', coingeckoId: 'polkadot' },
-    MATIC: { symbol: 'MATIC', name: 'Polygon', image: 'https://assets.coingecko.com/coins/images/4713/small/polygon.png', coingeckoId: 'matic-network' },
+    POL: { symbol: 'POL', name: 'Polygon', image: 'https://assets.coingecko.com/coins/images/4713/small/polygon.png', coingeckoId: 'matic-network' },
     UNI: { symbol: 'UNI', name: 'Uniswap', image: 'https://assets.coingecko.com/coins/images/12504/small/uniswap-uni.png', coingeckoId: 'uniswap' },
     ATOM: { symbol: 'ATOM', name: 'Cosmos', image: 'https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png', coingeckoId: 'cosmos' },
     LTC: { symbol: 'LTC', name: 'Litecoin', image: 'https://assets.coingecko.com/coins/images/2/small/litecoin.png', coingeckoId: 'litecoin' },

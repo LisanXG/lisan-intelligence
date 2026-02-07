@@ -272,11 +272,12 @@ describe('EMAAlignment', () => {
 });
 
 describe('BollingerPosition', () => {
-    it('returns position between 0 and 1', () => {
+    it('returns position in expected range', () => {
         const data = generateMockOHLCV(50).map(d => d.close);
         const result = BollingerPosition(data, 20);
-        expect(result.position).toBeGreaterThanOrEqual(0);
-        expect(result.position).toBeLessThanOrEqual(1);
+        // Bollinger %B can go below 0 or above 1 when price breaks outside bands
+        expect(result.position).toBeGreaterThanOrEqual(-0.5);
+        expect(result.position).toBeLessThanOrEqual(1.5);
     });
 
     it('calculates valid upper/lower bands', () => {
