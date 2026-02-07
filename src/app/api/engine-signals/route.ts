@@ -6,6 +6,8 @@ import {
     DEFAULT_WEIGHTS,
     HyperliquidContext
 } from '@/lib/engine';
+import { CURATED_ASSETS, COIN_METADATA } from '@/lib/constants/assets';
+import { detectMarketRegime, MarketRegime } from '@/lib/engine/regime';
 
 // Hyperliquid API
 const HYPERLIQUID_API = 'https://api.hyperliquid.xyz/info';
@@ -190,34 +192,12 @@ async function fetchFearGreed(): Promise<number | null> {
     }
 }
 
-// Main coins to analyze with CoinGecko image URLs (20 curated assets)
-const COINS_TO_ANALYZE = [
-    // Layer 1s
-    { symbol: 'BTC', name: 'Bitcoin', image: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png' },
-    { symbol: 'ETH', name: 'Ethereum', image: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png' },
-    { symbol: 'SOL', name: 'Solana', image: 'https://assets.coingecko.com/coins/images/4128/small/solana.png' },
-    { symbol: 'BNB', name: 'BNB', image: 'https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png' },
-    { symbol: 'AVAX', name: 'Avalanche', image: 'https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png' },
-    { symbol: 'SUI', name: 'Sui', image: 'https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg' },
-    { symbol: 'APT', name: 'Aptos', image: 'https://assets.coingecko.com/coins/images/26455/small/aptos_round.png' },
-    // DeFi & Perps
-    { symbol: 'HYPE', name: 'Hyperliquid', image: 'https://assets.coingecko.com/coins/images/40431/small/hyperliquid.jpeg' },
-    { symbol: 'LINK', name: 'Chainlink', image: 'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png' },
-    { symbol: 'AAVE', name: 'Aave', image: 'https://assets.coingecko.com/coins/images/12645/small/AAVE.png' },
-    { symbol: 'UNI', name: 'Uniswap', image: 'https://assets.coingecko.com/coins/images/12504/small/uniswap-uni.png' },
-    // Legacy & Payments
-    { symbol: 'XRP', name: 'XRP', image: 'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png' },
-    { symbol: 'LTC', name: 'Litecoin', image: 'https://assets.coingecko.com/coins/images/2/small/litecoin.png' },
-    { symbol: 'DOT', name: 'Polkadot', image: 'https://assets.coingecko.com/coins/images/12171/small/polkadot.png' },
-    { symbol: 'ATOM', name: 'Cosmos', image: 'https://assets.coingecko.com/coins/images/1481/small/cosmos_hub.png' },
-    // Scaling & L2s
-    { symbol: 'MATIC', name: 'Polygon', image: 'https://assets.coingecko.com/coins/images/4713/small/polygon.png' },
-    { symbol: 'ARB', name: 'Arbitrum', image: 'https://assets.coingecko.com/coins/images/16547/small/photo_2023-03-29_21.47.00.jpeg' },
-    { symbol: 'OP', name: 'Optimism', image: 'https://assets.coingecko.com/coins/images/25244/small/Optimism.png' },
-    // Memes (high volume)
-    { symbol: 'TON', name: 'Toncoin', image: 'https://assets.coingecko.com/coins/images/17980/small/ton_symbol.png' },
-    { symbol: 'TIA', name: 'Celestia', image: 'https://assets.coingecko.com/coins/images/31967/small/tia.jpg' },
-];
+// Derive coin list from single source of truth (CURATED_ASSETS + COIN_METADATA)
+const COINS_TO_ANALYZE = CURATED_ASSETS.map(symbol => ({
+    symbol,
+    name: COIN_METADATA[symbol].name,
+    image: COIN_METADATA[symbol].image,
+}));
 
 export interface EngineSignalResponse {
     signals: (SignalOutput & {
@@ -254,6 +234,31 @@ export async function GET() {
 
         const coinData = await Promise.all(ohlcvPromises);
 
+        // Detect market regime using BTC data (same approach as cron/generate)
+        const btcCoin = coinData.find(c => c.symbol === 'BTC');
+        let regime: MarketRegime = 'UNKNOWN';
+        if (btcCoin && btcCoin.data.length >= 50) {
+            try {
+                const altcoinChanges = coinData
+                    .filter(c => c.symbol !== 'BTC' && c.data.length >= 2)
+                    .map(c => {
+                        const last = c.data[c.data.length - 1].close;
+                        const prev = c.data[c.data.length - 2].close;
+                        return ((last - prev) / prev) * 100;
+                    });
+
+                const regimeResult = detectMarketRegime({
+                    btcData: btcCoin.data,
+                    altcoinChanges,
+                    avgFunding: 0,   // Snapshot data not available in display route
+                    avgOIChange: 0,
+                });
+                regime = regimeResult.regime;
+            } catch {
+                // Fall back to UNKNOWN if regime detection fails
+            }
+        }
+
         // Generate signals for coins with sufficient data
         const signals: EngineSignalResponse['signals'] = [];
 
@@ -281,7 +286,7 @@ export async function GET() {
                     };
                 }
 
-                const signal = generateSignal(coin.data, coin.symbol, fearGreed, weights, hlContext);
+                const signal = generateSignal(coin.data, coin.symbol, fearGreed, weights, hlContext, '4h', regime);
 
                 // Extract 7D sparkline (last 42 candles at 4h = 7 days)
                 const sparklineData = coin.data.slice(-42).map(d => d.close);

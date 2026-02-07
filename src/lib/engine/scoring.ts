@@ -365,10 +365,12 @@ export function generateSignal(
     const regimeAdj = getRegimeAdjustments(regime);
 
     // Need significant bias and minimum score to trigger signal
-    // Base threshold 40 — regime multiplier adjusts dynamically
-    // (e.g., BULL_TREND: 36, HIGH_VOL_CHOP: 52, UNKNOWN: 40)
+    // Base threshold 25 — lowered from 40 to generate more actionable signals.
+    // The PineScript uses 35 on an 85-pt scale; this is proportionally similar.
+    // Regime multiplier adjusts dynamically:
+    // (e.g., BULL_TREND: 23, HIGH_VOL_CHOP: 33, UNKNOWN: 25)
     const directionThreshold = totalMax * 0.10;
-    const scoreThreshold = Math.round(40 * regimeAdj.scoreThresholdMultiplier);
+    const scoreThreshold = Math.round(25 * regimeAdj.scoreThresholdMultiplier);
 
     // Apply regime direction bias to total direction
     const adjustedDirection = totalDirection + (regimeAdj.directionBias * totalMax * 0.02);

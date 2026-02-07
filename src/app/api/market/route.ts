@@ -1,36 +1,13 @@
 import { NextResponse } from 'next/server';
+import { CURATED_ASSETS, COIN_METADATA } from '@/lib/constants/assets';
 
-// Tracked coins list - must match engine-signals and cron/generate
-const TRACKED_COINS = [
-    'bitcoin', 'ethereum', 'solana', 'binancecoin', 'avalanche-2',
-    'sui', 'aptos', 'hyperliquid', 'chainlink', 'aave',
-    'uniswap', 'ripple', 'litecoin', 'polkadot', 'cosmos',
-    'matic-network', 'arbitrum', 'optimism', 'the-open-network', 'celestia'
-];
+// Derive tracked coins from single source of truth
+const TRACKED_COINS = CURATED_ASSETS.map(s => COIN_METADATA[s].coingeckoId);
 
-// Symbol to CoinGecko ID mapping for our tracked coins
-const SYMBOL_TO_ID: Record<string, string> = {
-    'btc': 'bitcoin',
-    'eth': 'ethereum',
-    'sol': 'solana',
-    'bnb': 'binancecoin',
-    'avax': 'avalanche-2',
-    'sui': 'sui',
-    'apt': 'aptos',
-    'hype': 'hyperliquid',
-    'link': 'chainlink',
-    'aave': 'aave',
-    'uni': 'uniswap',
-    'xrp': 'ripple',
-    'ltc': 'litecoin',
-    'dot': 'polkadot',
-    'atom': 'cosmos',
-    'matic': 'matic-network',
-    'arb': 'arbitrum',
-    'op': 'optimism',
-    'ton': 'the-open-network',
-    'tia': 'celestia'
-};
+// Symbol to CoinGecko ID mapping derived from COIN_METADATA
+const SYMBOL_TO_ID: Record<string, string> = Object.fromEntries(
+    CURATED_ASSETS.map(s => [s.toLowerCase(), COIN_METADATA[s].coingeckoId])
+);
 
 // Server-side API route - fetches from CoinGecko (only shows tracked coins)
 export async function GET() {

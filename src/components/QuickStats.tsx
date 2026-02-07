@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { ASSET_COUNT } from '@/lib/constants/assets';
 
 interface MarketStats {
     btcDominance: number;
@@ -29,7 +30,7 @@ export default function QuickStats() {
                     btcDominance: btc ? (btc.market_cap / totalMcap) * 100 : 55,
                     totalMarketCap: totalMcap,
                     total24hVolume: totalVol,
-                    activeCryptos: coins.length,
+                    activeCryptos: ASSET_COUNT,
                 });
             } catch (error) {
                 console.error('Failed to fetch stats:', error);

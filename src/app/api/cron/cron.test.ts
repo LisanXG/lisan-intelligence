@@ -46,6 +46,10 @@ vi.mock('@/lib/supabaseServer', () => ({
     findUnprocessedLossStreak: vi.fn().mockResolvedValue({ count: 0, signalIds: [], streakEndTime: null }),
     findUnprocessedWinStreak: vi.fn().mockResolvedValue({ count: 0, signalIds: [], streakEndTime: null }),
     getRecentlyClosedCoins: vi.fn().mockResolvedValue([]),
+    getMarketSnapshots: vi.fn().mockResolvedValue(new Map()),
+    upsertMarketSnapshot: vi.fn().mockResolvedValue(null),
+    getCacheValue: vi.fn().mockResolvedValue(null),
+    setCacheValue: vi.fn().mockResolvedValue(null),
     // Phase 4: Context-aware learning mocks
     getTrailingWinRate: vi.fn().mockResolvedValue({ winRate: 70, wins: 7, losses: 3, total: 10 }),
     getDirectionalStats: vi.fn().mockResolvedValue({
@@ -62,6 +66,22 @@ vi.mock('@/lib/supabaseServer', () => ({
             insert: vi.fn().mockResolvedValue({ data: null, error: null }),
         }),
     },
+}));
+
+// Mock engine/prices module (live price fetching)
+vi.mock('@/lib/engine/prices', () => ({
+    fetchCurrentPrices: vi.fn().mockResolvedValue(new Map()),
+}));
+
+// Mock engine/hyperliquidData module
+vi.mock('@/lib/engine/hyperliquidData', () => ({
+    fetchHyperliquidMarketContext: vi.fn().mockResolvedValue({ assets: new Map(), avgFunding: 0 }),
+}));
+
+// Mock engine/regime module
+vi.mock('@/lib/engine/regime', () => ({
+    detectMarketRegime: vi.fn().mockReturnValue({ regime: 'NEUTRAL', confidence: 0.5 }),
+    MarketRegime: { NEUTRAL: 'NEUTRAL', BULLISH: 'BULLISH', BEARISH: 'BEARISH' },
 }));
 
 // Mock fetch globally
@@ -212,10 +232,11 @@ describe('Cron Route Response Structure', () => {
             (getAllPendingSignals as ReturnType<typeof vi.fn>).mockResolvedValue([
                 { coin: 'BTC' }, { coin: 'ETH' }, { coin: 'SOL' }
             ]);
+            // All 20 CURATED_ASSETS minus the 3 pending above = 17 in cooldown
             (getRecentlyClosedCoins as ReturnType<typeof vi.fn>).mockResolvedValue([
-                'TON', 'LINK', 'AVAX', 'MATIC', 'UNI', 'AAVE', 'PEPE',
-                'WIF', 'SUI', 'XRP', 'HYPE', 'OP', 'ARB', 'NEAR',
-                'INJ', 'TIA', 'RENDER'
+                'AVAX', 'LINK', 'TON', 'XRP', 'ADA', 'DOT', 'MATIC',
+                'UNI', 'ATOM', 'LTC', 'NEAR', 'ARB', 'OP', 'APT',
+                'SUI', 'HYPE', 'INJ'
             ]);
 
             const { GET } = await import('@/app/api/cron/generate/route');
@@ -275,17 +296,18 @@ describe('Cron Route Error Handling', () => {
 
     describe('Generate Route', () => {
         it('handles external API failures gracefully', async () => {
-            mockFetch.mockResolvedValue({
-                ok: false,
-                status: 500,
-            });
+            mockFetch.mockRejectedValue(new Error('API failure'));
 
             const { GET } = await import('@/app/api/cron/generate/route');
             const request = createNextRequest('http://localhost/api/cron/generate?secret=test-secret-123');
             const response = await GET(request);
 
-            // Should handle gracefully
+            // Route handles gracefully — internal helpers catch errors and return empty data
+            // So the route completes normally with 200 and skips coins with insufficient data
             expect(response.status).toBe(200);
+            const json = await response.json();
+            expect(json.success).toBe(true);
+            expect(json).toHaveProperty('duration');
         });
     });
 });
