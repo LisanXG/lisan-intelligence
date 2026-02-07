@@ -3,6 +3,7 @@
 import { SignalOutput } from '@/lib/engine';
 import { useState, useEffect, useCallback } from 'react';
 import ShareButton from './ShareButton';
+import SignalDetailModal from './SignalDetailModal';
 import { useAuth } from '@/context/auth-context';
 import {
     isInWatchlist as isInWatchlistDb,
@@ -35,6 +36,7 @@ export default function SignalCard({ signal, sparklineData, onWatchlistChange }:
 
     const [imgError, setImgError] = useState(false);
     const [isWatched, setIsWatched] = useState(false);
+    const [showDetail, setShowDetail] = useState(false);
     const [bucketContext, setBucketContext] = useState<{ winRate: number; sampleSize: number } | null>(null);
 
     // Check watchlist status on mount
@@ -159,6 +161,16 @@ export default function SignalCard({ signal, sparklineData, onWatchlistChange }:
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Details Button */}
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setShowDetail(true); }}
+                        className="p-2 rounded-lg text-slate-400 hover:text-[var(--accent-cyan)] hover:bg-slate-50 transition-all"
+                        title="View indicator details"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                    </button>
                     {/* Share Button */}
                     <ShareButton signal={signal} />
                     {/* Watchlist Star Button */}
@@ -217,6 +229,11 @@ export default function SignalCard({ signal, sparklineData, onWatchlistChange }:
                 <div className="text-xs text-center pt-2 text-[var(--text-muted)]">
                     Signals in this range: <span className={bucketContext.winRate >= 50 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-orange)]'}>{bucketContext.winRate.toFixed(0)}% win rate</span> ({bucketContext.sampleSize} signals)
                 </div>
+            )}
+
+            {/* Detail Modal */}
+            {showDetail && (
+                <SignalDetailModal signal={signal} onClose={() => setShowDetail(false)} />
             )}
         </div>
     );
