@@ -282,7 +282,8 @@ export function generateSignal(
     const sentiment = calculateSentimentScore(fearGreedIndex, weights);
 
     // Calculate positioning score from Hyperliquid data
-    let positioning = { score: 0, max: weights.fundingRate + weights.oiChange, direction: 0 };
+    // When hlContext is null, max must be 0 so positioning doesn't inflate the denominator
+    let positioning = { score: 0, max: 0, direction: 0 };
     let fundingRateValue = 0;
     let oiChangeValue = 0;
     let basisPremiumValue = 0;
