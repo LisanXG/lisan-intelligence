@@ -2,6 +2,7 @@
 
 import { SignalOutput } from '@/lib/engine';
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface SignalDetailModalProps {
     signal: SignalOutput & { name?: string; image?: string };
@@ -225,7 +226,7 @@ export default function SignalDetailModal({ signal, onClose }: SignalDetailModal
     const dirColor = direction === 'LONG' ? '#10b981' : direction === 'SHORT' ? '#ef4444' : '#9ca3af';
     const dirBg = direction === 'LONG' ? 'rgba(16,185,129,0.15)' : direction === 'SHORT' ? 'rgba(239,68,68,0.15)' : 'rgba(156,163,175,0.15)';
 
-    return (
+    return createPortal(
         <div
             className="fixed inset-0 z-[100] flex items-center justify-center p-4"
             onClick={onClose}
@@ -378,6 +379,7 @@ export default function SignalDetailModal({ signal, onClose }: SignalDetailModal
                     </p>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
