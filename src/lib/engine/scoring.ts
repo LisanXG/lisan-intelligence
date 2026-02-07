@@ -365,8 +365,10 @@ export function generateSignal(
     const regimeAdj = getRegimeAdjustments(regime);
 
     // Need significant bias and minimum score to trigger signal
+    // Base threshold 40 — regime multiplier adjusts dynamically
+    // (e.g., BULL_TREND: 36, HIGH_VOL_CHOP: 52, UNKNOWN: 40)
     const directionThreshold = totalMax * 0.10;
-    const scoreThreshold = Math.round(50 * regimeAdj.scoreThresholdMultiplier); // Regime adjusts strictness
+    const scoreThreshold = Math.round(40 * regimeAdj.scoreThresholdMultiplier);
 
     // Apply regime direction bias to total direction
     const adjustedDirection = totalDirection + (regimeAdj.directionBias * totalMax * 0.02);

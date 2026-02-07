@@ -3,7 +3,8 @@ import {
     generateSignal,
     OHLCV,
     SignalOutput,
-    DEFAULT_WEIGHTS
+    DEFAULT_WEIGHTS,
+    HyperliquidContext
 } from '@/lib/engine';
 
 // Hyperliquid API
@@ -15,13 +16,23 @@ interface HyperliquidAssetCtx {
     openInterest: string;
     markPx: string;
     dayNtlVlm: string;
+    premium: string;
 }
 
 interface HyperliquidMeta {
     universe: { name: string }[];
 }
 
-async function fetchHyperliquidData(): Promise<Map<string, { fundingRate: number; openInterest: number; fundingSignal: 'BULLISH' | 'BEARISH' | 'NEUTRAL' }>> {
+interface HLEnrichedData {
+    fundingRate: number;
+    annualizedFunding: number;
+    openInterest: number;
+    premium: number;
+    volume24h: number;
+    fundingSignal: 'BULLISH' | 'BEARISH' | 'NEUTRAL';
+}
+
+async function fetchHyperliquidData(): Promise<Map<string, HLEnrichedData>> {
     try {
         const response = await fetch(HYPERLIQUID_API, {
             method: 'POST',
@@ -33,22 +44,28 @@ async function fetchHyperliquidData(): Promise<Map<string, { fundingRate: number
         if (!response.ok) return new Map();
 
         const [meta, assetCtxs] = await response.json() as [HyperliquidMeta, HyperliquidAssetCtx[]];
-        const result = new Map<string, { fundingRate: number; openInterest: number; fundingSignal: 'BULLISH' | 'BEARISH' | 'NEUTRAL' }>();
+        const result = new Map<string, HLEnrichedData>();
 
         meta.universe.forEach((asset, idx) => {
             const ctx = assetCtxs[idx];
             if (!ctx) return;
 
             const fundingRate = parseFloat(ctx.funding);
-            const annualized = fundingRate * 8760;
+            const annualizedFunding = fundingRate * 8760;
+            const openInterest = parseFloat(ctx.openInterest) * parseFloat(ctx.markPx);
+            const premium = parseFloat(ctx.premium || '0');
+            const volume24h = parseFloat(ctx.dayNtlVlm || '0');
             const fundingSignal: 'BULLISH' | 'BEARISH' | 'NEUTRAL' =
-                annualized > 0.3 ? 'BEARISH' :   // Crowded longs
-                    annualized < -0.1 ? 'BULLISH' :  // Crowded shorts
+                annualizedFunding > 0.3 ? 'BEARISH' :
+                    annualizedFunding < -0.1 ? 'BULLISH' :
                         'NEUTRAL';
 
             result.set(asset.name.toUpperCase(), {
                 fundingRate,
-                openInterest: parseFloat(ctx.openInterest) * parseFloat(ctx.markPx),
+                annualizedFunding,
+                openInterest,
+                premium,
+                volume24h,
                 fundingSignal,
             });
         });
@@ -247,35 +264,38 @@ export async function GET() {
             }
 
             try {
-                const signal = generateSignal(coin.data, coin.symbol, fearGreed, weights);
+                // Get Hyperliquid data for this coin
+                const hlData = hyperliquidData.get(coin.symbol.toUpperCase());
+
+                // Build HyperliquidContext for the scoring engine
+                let hlContext: HyperliquidContext | null = null;
+                if (hlData) {
+                    hlContext = {
+                        fundingRate: hlData.fundingRate,
+                        annualizedFunding: hlData.annualizedFunding,
+                        openInterest: hlData.openInterest,
+                        premium: hlData.premium,
+                        volume24h: hlData.volume24h,
+                        // Note: prevOpenInterest, avgVolume, prevFunding require stored snapshots
+                        // — available in cron/generate but not here. The engine handles missing optionals gracefully.
+                    };
+                }
+
+                const signal = generateSignal(coin.data, coin.symbol, fearGreed, weights, hlContext);
 
                 // Extract 7D sparkline (last 42 candles at 4h = 7 days)
                 const sparklineData = coin.data.slice(-42).map(d => d.close);
 
-                // Get Hyperliquid data for this coin
-                const hlData = hyperliquidData.get(coin.symbol.toUpperCase());
-
-                // Apply funding signal boost/penalty (up to ±5 points)
-                let adjustedScore = signal.score;
-                if (hlData) {
-                    if (hlData.fundingSignal === 'BULLISH' && signal.direction === 'LONG') {
-                        adjustedScore = Math.min(100, adjustedScore + 5);
-                    } else if (hlData.fundingSignal === 'BEARISH' && signal.direction === 'SHORT') {
-                        adjustedScore = Math.min(100, adjustedScore + 5);
-                    } else if (hlData.fundingSignal === 'BULLISH' && signal.direction === 'SHORT') {
-                        adjustedScore = Math.max(0, adjustedScore - 3);
-                    } else if (hlData.fundingSignal === 'BEARISH' && signal.direction === 'LONG') {
-                        adjustedScore = Math.max(0, adjustedScore - 3);
-                    }
-                }
-
                 signals.push({
                     ...signal,
-                    score: adjustedScore,
                     name: coin.name,
                     image: coin.image,
                     sparkline: sparklineData,
-                    hyperliquid: hlData,
+                    hyperliquid: hlData ? {
+                        fundingRate: hlData.fundingRate,
+                        openInterest: hlData.openInterest,
+                        fundingSignal: hlData.fundingSignal,
+                    } : undefined,
                 });
             } catch (error) {
                 console.error(`Failed to generate signal for ${coin.symbol}:`, error);
