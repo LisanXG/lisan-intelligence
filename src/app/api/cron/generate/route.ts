@@ -15,6 +15,10 @@ import {
     getGlobalWeights,
     findUnprocessedLossStreak,
     getRecentlyClosedCoins,
+    getMarketSnapshots,
+    upsertMarketSnapshot,
+    getCacheValue,
+    setCacheValue,
 } from '@/lib/supabaseServer';
 import {
     generateSignal,
@@ -26,6 +30,7 @@ import {
 import { CURATED_ASSETS } from '@/lib/constants/assets';
 import { fetchHyperliquidMarketContext } from '@/lib/engine/hyperliquidData';
 import { detectMarketRegime, MarketContext, MarketRegime } from '@/lib/engine/regime';
+import { fetchCurrentPrices } from '@/lib/engine/prices';
 
 const HYPERLIQUID_API = 'https://api.hyperliquid.xyz/info';
 
@@ -126,46 +131,28 @@ async function fetchHyperliquidCandles(symbol: string): Promise<OHLCV[]> {
 async function fetchFearGreed(): Promise<number | null> {
     try {
         const response = await fetch('https://api.alternative.me/fng/?limit=1');
-        if (!response.ok) return null;
+        if (!response.ok) throw new Error(`F&G API returned ${response.status}`);
         const data = await response.json();
-        return parseInt(data.data?.[0]?.value) || null;
+        const value = parseInt(data.data?.[0]?.value) || null;
+
+        // Cache the successful value for fallback
+        if (value !== null) {
+            await setCacheValue('fear_greed_latest', { value, timestamp: Date.now() });
+        }
+
+        return value;
     } catch {
+        // Fallback: try cached value
+        const cached = await getCacheValue<{ value: number; timestamp: number }>('fear_greed_latest');
+        if (cached && cached.value) {
+            console.log(`[CronGenerate] F&G API failed, using cached value: ${cached.value}`);
+            return cached.value;
+        }
+        console.error('[CronGenerate] F&G API failed and no cache available');
         return null;
     }
 }
 
-/**
- * Fetch CURRENT live prices from Hyperliquid (mark prices)
- * CRITICAL: Use this for entry_price, NOT candle close which can be stale
- */
-async function fetchCurrentPrices(): Promise<Map<string, number>> {
-    try {
-        const response = await fetch(HYPERLIQUID_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'metaAndAssetCtxs' }),
-        });
-
-        if (!response.ok) return new Map();
-
-        interface HLAsset { name: string }
-        interface HLContext { markPx: string }
-        const [meta, assetCtxs] = await response.json() as [{ universe: HLAsset[] }, HLContext[]];
-        const prices = new Map<string, number>();
-
-        meta.universe.forEach((asset, idx) => {
-            const ctx = assetCtxs[idx];
-            if (ctx?.markPx) {
-                prices.set(asset.name.toUpperCase(), parseFloat(ctx.markPx));
-            }
-        });
-
-        return prices;
-    } catch (error) {
-        console.error('[CronGenerate] Error fetching live prices:', error);
-        return new Map();
-    }
-}
 
 export async function GET(request: NextRequest) {
     const secret = request.nextUrl.searchParams.get('secret');
@@ -220,18 +207,39 @@ export async function GET(request: NextRequest) {
 
         // 6. Detect market regime (NEW)
         const btcOHLCV = await fetchOHLCV('BTC');
-        const altcoinChanges = coinsToGenerate
-            .filter(c => c !== 'BTC')
-            .map(c => {
-                const asset = hlMarketContext?.assets.get(c.toUpperCase());
-                return asset?.premium ? asset.premium * 100 : 0;
-            });
+
+        // Fetch previous market snapshots FIRST — used for both regime detection and signal generation
+        const prevSnapshots = await getMarketSnapshots(coinsToGenerate);
+        log.debug(`Fetched ${prevSnapshots.size} previous market snapshots`);
+
+        // Compute real avgOIChange from previous snapshots vs current HL data
+        let totalOIChange = 0;
+        let oiChangeCount = 0;
+        for (const coin of coinsToGenerate) {
+            const hlAsset = hlMarketContext?.assets.get(coin.toUpperCase());
+            const prevSnap = prevSnapshots.get(coin.toUpperCase());
+            if (hlAsset && prevSnap && prevSnap.open_interest > 0) {
+                totalOIChange += ((hlAsset.openInterest - prevSnap.open_interest) / prevSnap.open_interest) * 100;
+                oiChangeCount++;
+            }
+        }
+
+        // Compute real altcoin price changes from OHLCV (not premium)
+        const altcoinChanges: number[] = [];
+        for (const c of coinsToGenerate.filter(c => c !== 'BTC')) {
+            const altOHLCV = await fetchOHLCV(c);
+            if (altOHLCV.length >= 2) {
+                const pctChange = ((altOHLCV[altOHLCV.length - 1].close - altOHLCV[altOHLCV.length - 2].close) /
+                    altOHLCV[altOHLCV.length - 2].close) * 100;
+                altcoinChanges.push(pctChange);
+            }
+        }
 
         const regimeContext: MarketContext = {
             btcData: btcOHLCV,
             altcoinChanges,
             avgFunding: hlMarketContext?.avgFunding || 0,
-            avgOIChange: 0,
+            avgOIChange: oiChangeCount > 0 ? totalOIChange / oiChangeCount : 0,
         };
 
         const regimeAnalysis = detectMarketRegime(regimeContext);
@@ -241,7 +249,10 @@ export async function GET(request: NextRequest) {
         const livePrices = await fetchCurrentPrices();
         log.debug(`Fetched live prices for ${livePrices.size} assets`);
 
-        // 8. Generate signals for missing coins
+        // Track coins with HL data for snapshot upserts after generation
+        const snapshotsToUpsert: { coin: string; oi: number; vol: number; funding: number; prevAvg: number; prevUpdatedAt: string | null }[] = [];
+
+        // 9. Generate signals for missing coins
         const generated: { coin: string; direction: string; score: number }[] = [];
 
         for (const coin of coinsToGenerate) {
@@ -265,16 +276,37 @@ export async function GET(request: NextRequest) {
                         ohlcv[ohlcv.length - 2].close) * 100
                     : 0;
 
+                // Fetch previous snapshot for comparison
+                const prevSnapshot = prevSnapshots.get(coin.toUpperCase());
+
                 hlContext = {
-                    fundingRate: hlAsset!.fundingRate,
-                    annualizedFunding: hlAsset!.annualizedFunding,
-                    openInterest: hlAsset!.openInterest,
-                    // Note: We don't have prevOpenInterest yet - will add in Phase 3
+                    fundingRate: hlAsset.fundingRate,
+                    annualizedFunding: hlAsset.annualizedFunding,
+                    openInterest: hlAsset.openInterest,
                     priceChange,
+                    // #1 FIX: Real previous OI from stored snapshot (use ?? to preserve zero values)
+                    prevOpenInterest: prevSnapshot?.open_interest ?? undefined,
+                    // v4.1: Pass new HL-native data for scoring
+                    premium: hlAsset.premium,
+                    volume24h: hlAsset.volume24h,
+                    // #1 FIX: Real rolling 7-day avg from stored snapshot
+                    avgVolume: prevSnapshot?.volume_7d_avg || hlAsset.volume24h,
+                    // #4 FIX: Previous funding rate for velocity boost (use ?? to preserve zero)
+                    prevFunding: prevSnapshot?.funding_rate ?? undefined,
                 };
+
+                // Queue snapshot upsert (pass snapshot for timestamp check)
+                snapshotsToUpsert.push({
+                    coin: coin.toUpperCase(),
+                    oi: hlAsset.openInterest,
+                    vol: hlAsset.volume24h,
+                    funding: hlAsset.annualizedFunding,
+                    prevAvg: prevSnapshot?.volume_7d_avg || 0,
+                    prevUpdatedAt: prevSnapshot?.updated_at || null,
+                });
             }
 
-            const signal = generateSignal(ohlcv, coin, fearGreed, effectiveWeights, hlContext);
+            const signal = generateSignal(ohlcv, coin, fearGreed, effectiveWeights, hlContext, '4h', regimeAnalysis.regime);
 
             // Only add if not HOLD
             if (signal.direction !== 'HOLD') {
@@ -288,9 +320,9 @@ export async function GET(request: NextRequest) {
                 // If candle close and live price differ by >5%, something is wrong
                 const candleClose = ohlcv[ohlcv.length - 1]?.close;
                 if (candleClose) {
-                    const priceDiff = Math.abs((livePrice! - candleClose) / candleClose) * 100;
+                    const priceDiff = Math.abs((livePrice - candleClose) / candleClose) * 100;
                     if (priceDiff > 5) {
-                        log.info(`BLOCKED ${coin}: Price mismatch - live $${livePrice!.toFixed(2)} vs candle $${candleClose.toFixed(2)} (${priceDiff.toFixed(1)}% diff)`);
+                        log.info(`BLOCKED ${coin}: Price mismatch - live $${livePrice.toFixed(2)} vs candle $${candleClose.toFixed(2)} (${priceDiff.toFixed(1)}% diff)`);
                         continue;
                     }
                 }
@@ -310,12 +342,12 @@ export async function GET(request: NextRequest) {
                 let liveTakeProfit: number;
 
                 if (signal.direction === 'LONG') {
-                    liveStopLoss = livePrice! * (1 - (atrPercent * 1.5));
-                    liveTakeProfit = livePrice! * (1 + (atrPercent * 3));
+                    liveStopLoss = livePrice * (1 - (atrPercent * 1.5));
+                    liveTakeProfit = livePrice * (1 + (atrPercent * 3));
                 } else {
                     // SHORT
-                    liveStopLoss = livePrice! * (1 + (atrPercent * 1.5));
-                    liveTakeProfit = livePrice! * (1 - (atrPercent * 3));
+                    liveStopLoss = livePrice * (1 + (atrPercent * 1.5));
+                    liveTakeProfit = livePrice * (1 - (atrPercent * 3));
                 }
 
                 const added = await addGlobalSignal({
@@ -346,11 +378,29 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        // 6. Check if learning should trigger (global)
+        // 10. Check if learning should trigger (global)
         const lossStreak = await findUnprocessedLossStreak();
         const consecutiveLosses = lossStreak.count;
         if (consecutiveLosses >= 3) {
             log.info(`${consecutiveLosses} consecutive losses - learning needed`);
+        }
+
+        // 11. Persist market snapshots for next run's comparison
+        for (const snap of snapshotsToUpsert) {
+            // #2 FIX: Only update volume avg when snapshot is >20h old
+            // The EMA formula assumes once-per-day updates; running on 15-min cycle destroys smoothing
+            const hoursSinceUpdate = snap.prevUpdatedAt
+                ? (Date.now() - new Date(snap.prevUpdatedAt).getTime()) / 3600000
+                : 999;
+            const shouldUpdateVolumeAvg = hoursSinceUpdate >= 20;
+
+            await upsertMarketSnapshot(
+                snap.coin, snap.oi, snap.vol, snap.funding,
+                snap.prevAvg, shouldUpdateVolumeAvg
+            );
+        }
+        if (snapshotsToUpsert.length > 0) {
+            log.debug(`Upserted ${snapshotsToUpsert.length} market snapshots`);
         }
 
         return NextResponse.json({

@@ -68,7 +68,7 @@ export default function DocsPage() {
                     {/* Quick Stats */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12 pb-12 border-b border-slate-200">
                         <div className="text-center">
-                            <div className="text-4xl font-bold text-cyan-600 mb-2">15</div>
+                            <div className="text-4xl font-bold text-cyan-600 mb-2">17</div>
                             <div className="text-slate-500">Indicators</div>
                         </div>
                         <div className="text-center">
@@ -214,7 +214,7 @@ export default function DocsPage() {
                                 </p>
                                 <p className="text-lg text-slate-600 leading-relaxed mt-3">
                                     <strong>What it is:</strong> A research tool. A decision-support system. A way to see the market through
-                                    15 different quantitative lenses at once.
+                                    17 different quantitative lenses at once.
                                 </p>
                                 <p className="text-lg text-slate-600 leading-relaxed mt-3">
                                     <strong>What it is NOT:</strong> A trading bot. An automated system that executes trades on your behalf.
@@ -235,7 +235,7 @@ export default function DocsPage() {
                                         from perpetual exchanges.
                                     </li>
                                     <li>
-                                        <strong>Indicator Calculation</strong> — Computes 15 technical indicators across 6 categories:
+                                        <strong>Indicator Calculation</strong> — Computes 17 technical indicators across 6 categories:
                                         Momentum, Trend, Volume, Volatility, Sentiment, and Positioning. Each indicator produces a value, a signal
                                         (bullish/bearish/neutral), and a strength score (0.0 to 1.0).
                                     </li>
@@ -291,7 +291,7 @@ export default function DocsPage() {
                             </div>
                         </Accordion>
 
-                        <Accordion title="The 15 Indicators — Complete Breakdown">
+                        <Accordion title="The 17 Indicators — Complete Breakdown">
                             <p className="mb-6">
                                 Every indicator in the engine outputs three things:
                             </p>
@@ -429,7 +429,7 @@ export default function DocsPage() {
                                 <div>
                                     <h4 className="text-xl font-semibold text-amber-700 mb-4 flex items-center gap-3">
                                         <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-                                        Volatility Cluster (16 points)
+                                        Volatility Cluster (10 points)
                                     </h4>
                                     <p className="text-slate-600 mb-4">
                                         Statistical measure of price deviation from the norm. Mean reversion is a powerful force —
@@ -437,7 +437,7 @@ export default function DocsPage() {
                                     </p>
                                     <div className="bg-slate-50 rounded-lg p-4 space-y-4">
                                         <div>
-                                            <p className="font-semibold text-slate-700">Z-Score (16 pts)</p>
+                                            <p className="font-semibold text-slate-700">Z-Score (10 pts)</p>
                                             <p className="text-slate-600">
                                                 Statistical measure of how far price has deviated from the mean. Below -2 = price is 2+ standard deviations
                                                 below average (statistically oversold). Above +2 = statistically overbought. Mean reversion is a powerful force.
@@ -468,14 +468,14 @@ export default function DocsPage() {
                                     </div>
                                 </div>
 
-                                {/* Positioning - NEW in Engine v4 */}
                                 <div>
                                     <h4 className="text-xl font-semibold text-indigo-700 mb-4 flex items-center gap-3">
                                         <span className="w-3 h-3 rounded-full bg-indigo-500"></span>
-                                        Positioning (10 points) — NEW
+                                        Positioning Cluster (16 points)
                                     </h4>
                                     <p className="text-slate-600 mb-4">
-                                        Real-time derivatives data from Hyperliquid. Where is the crowd positioned?
+                                        v4.1 introduced a full Positioning Cluster — live Hyperliquid institutional data
+                                        as first-class weighted indicators. Where is the crowd positioned?
                                         Crowded trades tend to unwind violently.
                                     </p>
                                     <div className="bg-slate-50 rounded-lg p-4 space-y-4">
@@ -493,6 +493,20 @@ export default function DocsPage() {
                                                 Rising OI with falling price = aggressive shorting. Divergences signal potential reversals.
                                             </p>
                                         </div>
+                                        <div>
+                                            <p className="font-semibold text-slate-700">Basis Premium (3 pts)</p>
+                                            <p className="text-slate-600">
+                                                Mark-to-index spread from Hyperliquid. Large positive basis (mark &gt; index) signals
+                                                aggressive long positioning (contrarian bearish). Large negative basis = oversold (contrarian bullish).
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-slate-700">HL Volume Momentum (3 pts)</p>
+                                            <p className="text-slate-600">
+                                                Compares current 24h Hyperliquid volume to a rolling average. Volume surges (2x+ average)
+                                                during breakouts confirm the move. Low volume on moves suggests fakeouts.
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -506,23 +520,24 @@ export default function DocsPage() {
                             </p>
 
                             <div className="bg-slate-900 rounded-lg p-6 font-mono text-slate-300 mb-6 overflow-x-auto text-sm md:text-base">
-                                <div className="text-slate-500 mb-3">// For each of the 15 indicators:</div>
+                                <div className="text-slate-500 mb-3">// For each of the 17 indicators:</div>
                                 <div className="mb-4">
                                     <div>points = weight × strength</div>
                                     <div className="mt-2">if (signal === &apos;bullish&apos;) totalBullish += points</div>
                                     <div>if (signal === &apos;bearish&apos;) totalBearish += points</div>
                                 </div>
-                                <div className="text-slate-500 mb-3">// Calculate direction and score:</div>
+                                <div className="text-slate-500 mb-3">// v4.1: Cluster agreement penalizes contradictory signals</div>
                                 <div className="mb-4">
-                                    <div>directionalBias = totalBullish - totalBearish</div>
-                                    <div>totalScore = totalBullish + totalBearish</div>
-                                    <div>normalizedScore = (totalScore / maxPossible) × 100</div>
+                                    <div>agreement = agreementRatio(bullishCount, bearishCount)</div>
+                                    <div>normalizedScore = (totalScore / maxPossible) × 100 × agreement</div>
                                 </div>
-                                <div className="text-slate-500 mb-3">// Classification:</div>
+                                <div className="text-slate-500 mb-3">// Classification (v4.1: threshold adapts to market regime):</div>
                                 <div>
-                                    <div>if (directionalBias &gt; maxPossible × 0.10 AND normalizedScore &gt;= 50)</div>
+                                    <div>scoreThreshold = 50 × regimeMultiplier</div>
+                                    <div className="ml-4 text-slate-500">// e.g. 45 in bull trend, 65 in choppy markets</div>
+                                    <div className="mt-2">if (directionalBias &gt; maxPossible × 0.15 AND normalizedScore &gt;= scoreThreshold)</div>
                                     <div className="ml-4">direction = <span className="text-emerald-400">LONG</span></div>
-                                    <div className="mt-2">else if (directionalBias &lt; -maxPossible × 0.10 AND normalizedScore &gt;= 50)</div>
+                                    <div className="mt-2">else if (directionalBias &lt; -maxPossible × 0.15 AND normalizedScore &gt;= scoreThreshold)</div>
                                     <div className="ml-4">direction = <span className="text-red-400">SHORT</span></div>
                                     <div className="mt-2">else</div>
                                     <div className="ml-4">direction = <span className="text-slate-400">HOLD</span></div>
@@ -531,19 +546,20 @@ export default function DocsPage() {
 
                             <div className="space-y-4 mb-6">
                                 <div>
-                                    <p className="font-semibold text-slate-700">Why 10% directional bias threshold?</p>
+                                    <p className="font-semibold text-slate-700">Why 15% directional bias threshold?</p>
                                     <p className="text-slate-600">
-                                        Because 51% bullish vs 49% bearish isn&apos;t a signal — it&apos;s a coin flip.
-                                        We require a clear directional edge before emitting a LONG or SHORT signal.
+                                        v4.1 raised this from 10% to 15%. Because 55% bullish vs 45% bearish isn&apos;t conviction —
+                                        it&apos;s noise. We require a clear directional edge before emitting a LONG or SHORT signal.
                                         If the indicators are split, that&apos;s a HOLD.
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="font-semibold text-slate-700">Why 50 minimum score?</p>
+                                    <p className="font-semibold text-slate-700">Why ~50 minimum score?</p>
                                     <p className="text-slate-600">
-                                        A score below 50 means most indicators are neutral or weak.
-                                        Even if there&apos;s a directional bias, there&apos;s no strong confluence.
-                                        We don&apos;t trade on weak setups — quality over quantity.
+                                        The base threshold is 50, meaning most indicators must show at least moderate alignment.
+                                        In v4.1, market regime detection adjusts this: in choppy markets (HIGH_VOL_CHOP) it rises to ~65
+                                        to filter noise, while in clear trends (BULL_TREND / BEAR_TREND) it drops to ~45
+                                        to capture higher-probability setups earlier. Quality over quantity, adapted to conditions.
                                     </p>
                                 </div>
                             </div>
@@ -596,30 +612,32 @@ export default function DocsPage() {
                             </div>
 
                             <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4 mt-6">
-                                <p className="font-semibold text-cyan-800 mb-2">Smart Exit Strategy — Momentum Re-Evaluation</p>
+                                <p className="font-semibold text-cyan-800 mb-2">Smart Exit Strategy — Dual-Timeframe Momentum Re-Evaluation</p>
                                 <p className="text-cyan-700 mb-3">
                                     When a trade reaches <strong>+3% profit</strong>, the engine doesn&apos;t exit immediately.
-                                    Instead, it fetches fresh market data and re-evaluates momentum:
+                                    Instead, it fetches fresh candle data on <strong>two timeframes (1h and 4h)</strong> and
+                                    re-evaluates RSI and MACD momentum on each:
                                 </p>
                                 <ul className="list-disc list-inside space-y-1 text-slate-600 ml-4 mb-3">
-                                    <li><strong>Momentum still aligned</strong> — RSI and MACD confirm trend direction → Let it run to full TP</li>
-                                    <li><strong>Momentum fading</strong> — Indicators show reversal signals → Take profit at current level</li>
+                                    <li><strong>Both timeframes aligned</strong> — RSI and MACD still confirm trend → Let it run to full TP</li>
+                                    <li><strong>Both timeframes fading</strong> — 1h AND 4h show reversal signals → Take profit at current level</li>
+                                    <li><strong>Mixed signals</strong> — Only one timeframe weakening → Stay in trade (single-TF noise, not conviction)</li>
                                 </ul>
                                 <p className="text-slate-500 text-sm">
-                                    This prevents cutting winners short while still protecting gains when momentum shifts.
+                                    v4.1 requires dual confirmation to exit — this prevents cutting winners short due to noise on a single timeframe.
                                 </p>
                             </div>
                         </Accordion>
 
                         <Accordion title="Self-Learning System — Adaptive Weights">
                             <p className="mb-6">
-                                Static systems die. Markets evolve. What worked in 2021 doesn&apos;t work in 2024.
+                                Static systems die. Markets evolve. What worked in 2021 doesn&apos;t work in 2025.
                                 The Lisan Core Engine adapts.
                             </p>
 
                             <p className="mb-6">
                                 Every signal generated is stored with its full indicator snapshot — every value,
-                                every weight used at the time. When the signal resolves (hits take profit, hits stop loss, or times out),
+                                every weight used at the time. When the signal resolves (hits take profit or hits stop loss),
                                 we record the outcome.
                             </p>
 
@@ -658,6 +676,22 @@ export default function DocsPage() {
                                 </p>
                             </div>
 
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mt-6">
+                                <p className="font-semibold text-emerald-800 mb-2">v4.1: Win Boost — Bidirectional Learning</p>
+                                <p className="text-slate-600 mb-3">
+                                    The engine doesn&apos;t just penalize failures — it also rewards success. When <strong>3 consecutive
+                                        wins</strong> are detected, a win-boost cycle triggers:
+                                </p>
+                                <ul className="list-disc list-inside space-y-1 text-slate-600 ml-4 mb-3">
+                                    <li><strong>Identify high-performing indicators</strong> — Which indicators were correctly confident in winning trades?</li>
+                                    <li><strong>Boost their weights</strong> — Up to <strong>10% per cycle</strong> (conservative, prevents runaway growth)</li>
+                                    <li><strong>60% correctness threshold</strong> — An indicator must appear correctly in at least 60% of winning signals to qualify for a boost</li>
+                                </ul>
+                                <p className="text-slate-600">
+                                    This ensures the system converges toward what actually works, not just away from what doesn&apos;t.
+                                </p>
+                            </div>
+
                             <div className="bg-cyan-50 border border-cyan-200 rounded-lg p-4 mt-6">
                                 <p className="font-semibold text-cyan-800 mb-2">Weight Recovery — Gradual Return to Defaults</p>
                                 <p className="text-slate-600 mb-3">
@@ -671,7 +705,7 @@ export default function DocsPage() {
                             </div>
                         </Accordion>
 
-                        <Accordion title="Market Regime Detection — NEW">
+                        <Accordion title="Market Regime Detection">
                             <p className="mb-6">
                                 Markets don&apos;t behave the same way all the time. A strategy that works in a bull trend
                                 fails in choppy consolidation. The engine now detects the current market regime and adjusts accordingly.
@@ -1066,7 +1100,7 @@ export default function DocsPage() {
 
                     {/* Version */}
                     <div className="mt-8 text-center text-slate-400">
-                        <p>Version 4.0.0 — February 2026 — Institutional Alpha: Regime Detection & Context-Aware Learning — LISAN HOLDINGS</p>
+                        <p>Version 4.1.0 — February 2026 — Positioning Cluster, Bidirectional Learning & Dual-TF Exits — LISAN HOLDINGS</p>
                     </div>
                 </div>
             </main>

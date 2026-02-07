@@ -11,8 +11,12 @@ import {
     HyperliquidAssetContext,
     FundingRateSignal,
     OIChangeSignal,
+    BasisPremiumSignal,
+    HLVolumeMomentumSignal,
+    FundingVelocityBoost,
     calculatePositioningScore,
 } from './hyperliquidData';
+import { MarketRegime, getRegimeAdjustments } from './regime';
 
 // ============================================================================
 // TYPES
@@ -32,19 +36,21 @@ export interface IndicatorWeights {
     adx: number;
     bollinger: number;
 
-    // Volume (16 points total - reduced from 20)
+    // Volume (16 points total)
     obvTrend: number;
     volumeRatio: number;
 
-    // Volatility (16 points - reduced from 22)
+    // Volatility (10 points — v4.1: reduced from 16 for new HL indicators)
     zScore: number;
 
     // Sentiment (8 points)
     fearGreed: number;
 
-    // Positioning (10 points - NEW: Hyperliquid institutional data)
+    // Positioning (16 points — v4.1: expanded with 2 new HL indicators)
     fundingRate: number;
     oiChange: number;
+    basisPremium: number;   // v4.1: Mark vs Index spread
+    hlVolume: number;       // v4.1: HL volume momentum
 }
 
 /**
@@ -56,12 +62,19 @@ export interface HyperliquidContext {
     openInterest: number;       // Current OI
     prevOpenInterest?: number;  // Previous OI for change calculation
     priceChange?: number;       // Price change percentage for OI signal
+    // v4.1: New HL-native data
+    premium?: number;           // Mark-index basis (fractional)
+    volume24h?: number;         // 24h USD volume
+    avgVolume?: number;         // Rolling avg daily volume (baseline for comparison)
+    prevFunding?: number;       // Previous annualized funding for velocity boost
 }
 
 export interface SignalOutput {
     coin: string;
     direction: SignalDirection;
     score: number;           // 0-100 confidence
+    agreement: number;       // 0-1 cluster agreement ratio (1 = all agree, 0.3 = floor)
+    timeframe: string;       // Candle interval that generated this signal (e.g. '4h')
 
     // Risk levels
     entryPrice: number;
@@ -75,7 +88,7 @@ export interface SignalOutput {
         trend: { score: number; max: number };
         volume: { score: number; max: number };
         sentiment: { score: number; max: number };
-        positioning: { score: number; max: number }; // NEW
+        positioning: { score: number; max: number };
     };
 
     // Raw indicator values (for learning)
@@ -102,19 +115,21 @@ export const DEFAULT_WEIGHTS: IndicatorWeights = {
     adx: 6,
     bollinger: 4,
 
-    // Volume: 16 points (reduced from 20)
+    // Volume: 16 points
     obvTrend: 10,
     volumeRatio: 6,
 
-    // Volatility: 16 points (reduced from 22)
-    zScore: 16,
+    // Volatility: 10 points (v4.1: reduced from 16 — Z-Score was over-weighted)
+    zScore: 10,
 
     // Sentiment: 8 points
     fearGreed: 8,
 
-    // Positioning: 10 points (NEW)
+    // Positioning: 16 points (v4.1: expanded from 10 with 2 new HL indicators)
     fundingRate: 6,
     oiChange: 4,
+    basisPremium: 3,    // v4.1: Mark-index basis (contrarian)
+    hlVolume: 3,        // v4.1: HL volume momentum
 };
 
 // ============================================================================
@@ -253,7 +268,9 @@ export function generateSignal(
     coin: string,
     fearGreedIndex: number | null = null,
     weights: IndicatorWeights = DEFAULT_WEIGHTS,
-    hlContext: HyperliquidContext | null = null
+    hlContext: HyperliquidContext | null = null,
+    timeframe: string = '4h',
+    regime: MarketRegime = 'UNKNOWN'
 ): SignalOutput {
     // Run all indicators
     const analysis = analyzeAsset(data);
@@ -264,13 +281,25 @@ export function generateSignal(
     const volume = calculateVolumeScore(analysis, weights);
     const sentiment = calculateSentimentScore(fearGreedIndex, weights);
 
-    // Calculate positioning score from Hyperliquid data (NEW)
+    // Calculate positioning score from Hyperliquid data
     let positioning = { score: 0, max: weights.fundingRate + weights.oiChange, direction: 0 };
     let fundingRateValue = 0;
     let oiChangeValue = 0;
+    let basisPremiumValue = 0;
+    let hlVolumeValue = 0;
 
     if (hlContext) {
         const fundingSignal = FundingRateSignal(hlContext.annualizedFunding);
+
+        // v4.1: Apply velocity boost if we have previous funding data
+        if (hlContext.prevFunding !== undefined) {
+            const velocityMultiplier = FundingVelocityBoost(
+                hlContext.annualizedFunding,
+                hlContext.prevFunding
+            );
+            fundingSignal.strength *= velocityMultiplier;
+        }
+
         fundingRateValue = fundingSignal.value;
 
         let oiSignal: IndicatorResult = { value: 0, signal: 'neutral', strength: 0 };
@@ -283,11 +312,26 @@ export function generateSignal(
             oiChangeValue = oiSignal.value;
         }
 
+        // v4.1: New HL-native signals
+        let basisSignal: IndicatorResult | undefined;
+        if (hlContext.premium !== undefined) {
+            basisSignal = BasisPremiumSignal(hlContext.premium);
+            basisPremiumValue = basisSignal.value;
+        }
+
+        let volumeSignal: IndicatorResult | undefined;
+        if (hlContext.volume24h !== undefined && hlContext.avgVolume !== undefined && hlContext.priceChange !== undefined) {
+            volumeSignal = HLVolumeMomentumSignal(hlContext.volume24h, hlContext.avgVolume, hlContext.priceChange);
+            hlVolumeValue = volumeSignal.value;
+        }
+
         positioning = calculatePositioningScore(
             fundingSignal,
             oiSignal,
             weights.fundingRate,
-            weights.oiChange
+            weights.oiChange,
+            basisSignal,
+            volumeSignal
         );
     }
 
@@ -295,22 +339,39 @@ export function generateSignal(
     const totalDirection = momentum.direction + trend.direction + volume.direction +
         sentiment.direction + positioning.direction;
 
-    // Total confidence score (0-100)
+    // Cluster agreement: penalize contradictory indicators
+    // If momentum says LONG but trend says SHORT, the raw score is high (both have magnitude)
+    // but the signal quality is low (no consensus). Agreement ratio captures this.
+    const clusterDirections = [momentum, trend, volume, sentiment, positioning]
+        .map(c => c.direction);
+    const nonZeroClusters = clusterDirections.filter(d => d !== 0);
+    const agreementRatio = nonZeroClusters.length > 0
+        ? Math.abs(nonZeroClusters.reduce((sum, d) => sum + Math.sign(d), 0)) / nonZeroClusters.length
+        : 1.0; // #8 FIX: All-neutral clusters should not penalize — default to 1.0
+    const agreementFactor = Math.max(0.3, agreementRatio); // Floor at 0.3 to avoid zeroing out
+
+    // Total confidence score (0-100), adjusted by cluster agreement
     const totalMax = momentum.max + trend.max + volume.max + sentiment.max + positioning.max;
     const rawScore = momentum.score + trend.score + volume.score + sentiment.score + positioning.score;
-    const score = Math.round((rawScore / totalMax) * 100);
+    const score = Math.round((rawScore / totalMax) * 100 * agreementFactor);
 
     // Determine direction based on consensus
     let direction: SignalDirection = 'HOLD';
 
-    // Need significant bias and minimum score to trigger signal
-    // Tuned for reasonable signal distribution (not too many HOLD)
-    const directionThreshold = totalMax * 0.10; // 10% of max in one direction
-    const scoreThreshold = 50; // Minimum 50/100 confidence (raised from 35 to filter low-conviction signals)
+    // v4.1: Apply regime-based threshold adjustments
+    const regimeAdj = getRegimeAdjustments(regime);
 
-    if (totalDirection > directionThreshold && score >= scoreThreshold) {
+    // Need significant bias and minimum score to trigger signal
+    // v4.1: Base 15% threshold, modified by regime's scoreThresholdMultiplier
+    const directionThreshold = totalMax * 0.15;
+    const scoreThreshold = Math.round(50 * regimeAdj.scoreThresholdMultiplier); // Regime adjusts strictness
+
+    // Apply regime direction bias to total direction
+    const adjustedDirection = totalDirection + (regimeAdj.directionBias * totalMax * 0.02);
+
+    if (adjustedDirection > directionThreshold && score >= scoreThreshold) {
         direction = 'LONG';
-    } else if (totalDirection < -directionThreshold && score >= scoreThreshold) {
+    } else if (adjustedDirection < -directionThreshold && score >= scoreThreshold) {
         direction = 'SHORT';
     }
 
@@ -335,15 +396,22 @@ export function generateSignal(
         zScore: analysis.volatility.zScore.value,
         atr: analysis.volatility.atr,
         vwap: analysis.trend.vwap,
-        // NEW: Hyperliquid positioning data
+        // Hyperliquid positioning data
         fundingRate: fundingRateValue,
         oiChange: oiChangeValue,
+        // v4.1: New HL indicators
+        basisPremium: basisPremiumValue,
+        hlVolume: hlVolumeValue,
+        // v4.1: Cluster agreement for learning visibility
+        agreement: agreementFactor,
     };
 
     return {
         coin,
         direction,
         score,
+        agreement: agreementFactor,
+        timeframe,
         entryPrice: riskLevels.entryPrice,
         stopLoss: riskLevels.stopLoss,
         takeProfit: riskLevels.takeProfit,

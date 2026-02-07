@@ -44,6 +44,7 @@ vi.mock('@/lib/supabaseServer', () => ({
     updateGlobalWeights: vi.fn().mockResolvedValue(true),
     getLastLearnedSignalId: vi.fn().mockResolvedValue(null),
     findUnprocessedLossStreak: vi.fn().mockResolvedValue({ count: 0, signalIds: [], streakEndTime: null }),
+    findUnprocessedWinStreak: vi.fn().mockResolvedValue({ count: 0, signalIds: [], streakEndTime: null }),
     getRecentlyClosedCoins: vi.fn().mockResolvedValue([]),
     // Phase 4: Context-aware learning mocks
     getTrailingWinRate: vi.fn().mockResolvedValue({ winRate: 70, wins: 7, losses: 3, total: 10 }),

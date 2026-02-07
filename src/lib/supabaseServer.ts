@@ -7,10 +7,10 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/logger';
-import type { DbSignal } from '@/lib/types/database';
+import type { DbSignal, ExitReason } from '@/lib/types/database';
 
 // Re-export for convenience
-export type { DbSignal };
+export type { DbSignal, ExitReason };
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -54,7 +54,7 @@ export async function updateSignalOutcomeServer(
     signalId: string,
     outcome: 'WON' | 'LOST',
     exitPrice: number,
-    exitReason: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT' | 'MOMENTUM_EXIT',
+    exitReason: ExitReason,
     profitPct: number
 ): Promise<DbSignal | null> {
     const { data, error } = await supabaseServer
@@ -288,6 +288,67 @@ export async function findUnprocessedLossStreak(): Promise<{
     return { count: 0, signalIds: [], streakEndTime: null };
 }
 
+/**
+ * v4.1: Find any streak of 3+ consecutive WINS that hasn't been processed.
+ * Mirrors findUnprocessedLossStreak but for the win-boost learning path.
+ */
+export async function findUnprocessedWinStreak(): Promise<{
+    count: number;
+    signalIds: string[];
+    streakEndTime: string | null;
+}> {
+    const { data, error } = await supabaseServer
+        .from('signals')
+        .select('id, outcome, closed_at')
+        .neq('outcome', 'PENDING')
+        .order('closed_at', { ascending: true });
+
+    if (error || !data || data.length === 0) {
+        return { count: 0, signalIds: [], streakEndTime: null };
+    }
+
+    // Get last win_boost learning event timestamp
+    const { data: lastBoost } = await supabaseServer
+        .from('learning_cycles')
+        .select('created_at')
+        .eq('triggered_by', 'consecutive_wins')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    const lastBoostedAt = lastBoost?.created_at ? new Date(lastBoost.created_at) : null;
+
+    let currentStreak: { id: string; closedAt: string }[] = [];
+
+    for (const signal of data) {
+        if (lastBoostedAt && new Date(signal.closed_at) <= lastBoostedAt) {
+            continue;
+        }
+
+        if (signal.outcome === 'WON') {
+            currentStreak.push({ id: signal.id, closedAt: signal.closed_at });
+        } else {
+            if (currentStreak.length >= 3) {
+                return {
+                    count: currentStreak.length,
+                    signalIds: currentStreak.map(s => s.id),
+                    streakEndTime: currentStreak[2].closedAt,
+                };
+            }
+            currentStreak = [];
+        }
+    }
+
+    if (currentStreak.length >= 3) {
+        return {
+            count: currentStreak.length,
+            signalIds: currentStreak.map(s => s.id),
+            streakEndTime: currentStreak[2].closedAt,
+        };
+    }
+
+    return { count: 0, signalIds: [], streakEndTime: null };
+}
 
 
 
@@ -498,5 +559,114 @@ export async function getTradesSinceIndicatorLoss(indicatorName: string, limit: 
 
     // Indicator hasn't appeared in a loss in the last 'limit' trades
     return tradesSinceLoss;
+}
+
+// ============================================================================
+// MARKET SNAPSHOTS — Historical OI, Volume, Funding for comparison signals
+// ============================================================================
+
+export interface MarketSnapshot {
+    coin: string;
+    open_interest: number;
+    volume_24h: number;
+    volume_7d_avg: number;
+    funding_rate: number;
+    updated_at: string;
+}
+
+/**
+ * Get previous market snapshots for multiple coins
+ * Returns a Map of coin → snapshot for O(1) lookups during generation
+ */
+export async function getMarketSnapshots(coins: string[]): Promise<Map<string, MarketSnapshot>> {
+    const result = new Map<string, MarketSnapshot>();
+
+    const { data, error } = await supabaseServer
+        .from('market_snapshots')
+        .select('*')
+        .in('coin', coins.map(c => c.toUpperCase()));
+
+    if (error || !data) {
+        console.error('[MarketSnapshots] Failed to fetch:', error?.message);
+        return result;
+    }
+
+    for (const row of data) {
+        result.set(row.coin, row as MarketSnapshot);
+    }
+
+    return result;
+}
+
+/**
+ * Upsert market snapshot for a single coin
+ * Calculates rolling 7-day average volume using exponential moving average:
+ *   newAvg = (prevAvg * 6 + currentVolume) / 7
+ * Only recalculates the average when shouldUpdateVolumeAvg is true (~once per day)
+ * to prevent the 15-min cron frequency from destroying the smoothing.
+ */
+export async function upsertMarketSnapshot(
+    coin: string,
+    openInterest: number,
+    volume24h: number,
+    fundingRate: number,
+    prevAvgVolume: number = 0,
+    shouldUpdateVolumeAvg: boolean = true
+): Promise<void> {
+    // Calculate rolling avg: only recalculate when enough time has passed
+    const volume7dAvg = shouldUpdateVolumeAvg
+        ? (prevAvgVolume > 0 ? (prevAvgVolume * 6 + volume24h) / 7 : volume24h)
+        : (prevAvgVolume > 0 ? prevAvgVolume : volume24h);
+
+    const { error } = await supabaseServer
+        .from('market_snapshots')
+        .upsert({
+            coin: coin.toUpperCase(),
+            open_interest: openInterest,
+            volume_24h: volume24h,
+            volume_7d_avg: volume7dAvg,
+            funding_rate: fundingRate,
+            updated_at: new Date().toISOString(),
+        }, { onConflict: 'coin' });
+
+    if (error) {
+        console.error(`[MarketSnapshots] Upsert failed for ${coin}:`, error.message);
+    }
+}
+
+// ============================================================================
+// CACHE STORE — Generic key-value cache (used for F&G fallback, etc.)
+// ============================================================================
+
+/**
+ * Get a cached value by key
+ */
+export async function getCacheValue<T>(key: string): Promise<T | null> {
+    const { data, error } = await supabaseServer
+        .from('cache_store')
+        .select('value, updated_at')
+        .eq('key', key)
+        .single();
+
+    if (error || !data) return null;
+
+    return data.value as T;
+}
+
+/**
+ * Set a cached value by key (upserts)
+ */
+export async function setCacheValue(key: string, value: unknown): Promise<void> {
+    const { error } = await supabaseServer
+        .from('cache_store')
+        .upsert({
+            key,
+            value,
+            updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' });
+
+    if (error) {
+        console.error(`[CacheStore] Upsert failed for ${key}:`, error.message);
+    }
 }
 

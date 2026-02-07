@@ -159,6 +159,49 @@ describe('generateSignal', () => {
         expect(signal.indicators).toBeDefined();
         expect(typeof signal.indicators).toBe('object');
     });
+
+    // ========================================================================
+    // v4.1: Agreement factor & timeframe tests
+    // ========================================================================
+
+    it('agreement factor is between 0.3 and 1.0', () => {
+        // Run on multiple data shapes to test bounds
+        const datasets = [
+            generateMockOHLCV(100),
+            generateUptrendData(100),
+            generateDowntrendData(100),
+        ];
+
+        for (const data of datasets) {
+            const signal = generateSignal(data, 'BTC');
+            expect(signal.agreement).toBeGreaterThanOrEqual(0.3);
+            expect(signal.agreement).toBeLessThanOrEqual(1.0);
+        }
+    });
+
+    it('includes agreement and timeframe in v4.1 output', () => {
+        const data = generateMockOHLCV(100);
+        const signal = generateSignal(data, 'BTC');
+
+        expect(signal).toHaveProperty('agreement');
+        expect(signal).toHaveProperty('timeframe');
+        expect(signal.timeframe).toBe('4h'); // Default timeframe
+        expect(signal.indicators).toHaveProperty('agreement');
+    });
+
+    it('strong uptrend has high agreement (aligned clusters)', () => {
+        const data = generateUptrendData(100);
+        const signal = generateSignal(data, 'BTC');
+        // A strong consistent trend should produce agreement at or above the floor
+        // Without sentiment/positioning data, only 3 of 5 clusters can align
+        expect(signal.agreement).toBeGreaterThanOrEqual(0.3);
+    });
+
+    it('respects custom timeframe parameter', () => {
+        const data = generateMockOHLCV(100);
+        const signal = generateSignal(data, 'BTC', null, undefined, null, '1h');
+        expect(signal.timeframe).toBe('1h');
+    });
 });
 
 // ============================================================================

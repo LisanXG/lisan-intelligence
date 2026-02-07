@@ -14,115 +14,97 @@ import {
     updateSignalOutcomeServer,
     DbSignal,
 } from '@/lib/supabaseServer';
+import { RSI, MACD } from '@/lib/engine/indicators';
 
-const HYPERLIQUID_API = 'https://api.hyperliquid.xyz/info';
+import { fetchCurrentPrices } from '@/lib/engine/prices';
 
-interface HyperliquidAssetCtx {
-    markPx: string;
-}
-
-interface HyperliquidMeta {
-    universe: { name: string }[];
-}
-
-/**
- * Fetch current prices from Hyperliquid
- */
-async function fetchCurrentPrices(): Promise<Map<string, number>> {
-    try {
-        const response = await fetch(HYPERLIQUID_API, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'metaAndAssetCtxs' }),
-        });
-
-        if (!response.ok) return new Map();
-
-        const [meta, assetCtxs] = await response.json() as [HyperliquidMeta, HyperliquidAssetCtx[]];
-        const prices = new Map<string, number>();
-
-        meta.universe.forEach((asset, idx) => {
-            const ctx = assetCtxs[idx];
-            if (ctx?.markPx) {
-                prices.set(asset.name.toUpperCase(), parseFloat(ctx.markPx));
-            }
-        });
-
-        return prices;
-    } catch (error) {
-        console.error('[Cron Monitor] Error fetching prices:', error);
-        return new Map();
-    }
-}
 
 /**
  * Fetch recent candles from Binance for momentum check
+ * v4.1: Added interval parameter (was hardcoded to 15m)
  */
-async function fetchRecentCandles(symbol: string, limit: number = 50): Promise<{ closes: number[]; data: { high: number; low: number; close: number; volume: number }[] } | null> {
+async function fetchRecentCandles(symbol: string, limit: number = 50, interval: string = '1h'): Promise<{ closes: number[]; data: { high: number; low: number; close: number; volume: number }[] } | null> {
+    // Try Binance first (primary)
     try {
         const pair = `${symbol.toUpperCase()}USDT`;
         const response = await fetch(
-            `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=15m&limit=${limit}`
+            `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${limit}`
         );
+
+        if (response.ok) {
+            const klines = await response.json() as [number, string, string, string, string, string][];
+            if (klines.length >= 20) {
+                const closes = klines.map(k => parseFloat(k[4]));
+                const data = klines.map(k => ({
+                    high: parseFloat(k[2]),
+                    low: parseFloat(k[3]),
+                    close: parseFloat(k[4]),
+                    volume: parseFloat(k[5]),
+                }));
+                return { closes, data };
+            }
+        }
+    } catch {
+        // Binance failed, try HL fallback
+    }
+
+    // Fallback: Hyperliquid candles
+    try {
+        const endTime = Date.now();
+        const intervalMs = interval === '4h' ? 4 * 60 * 60 * 1000 : 60 * 60 * 1000;
+        const startTime = endTime - (limit * intervalMs);
+
+        const response = await fetch('https://api.hyperliquid.xyz/info', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'candleSnapshot',
+                req: { coin: symbol.toUpperCase(), interval, startTime, endTime },
+            }),
+        });
 
         if (!response.ok) return null;
 
-        const klines = await response.json() as [number, string, string, string, string, string][];
-        const closes = klines.map(k => parseFloat(k[4]));
-        const data = klines.map(k => ({
-            high: parseFloat(k[2]),
-            low: parseFloat(k[3]),
-            close: parseFloat(k[4]),
-            volume: parseFloat(k[5]),
+        const candles = await response.json() as { t: number; o: string; h: string; l: string; c: string; v: string }[];
+        if (candles.length < 20) return null;
+
+        const closes = candles.map(c => parseFloat(c.c));
+        const data = candles.map(c => ({
+            high: parseFloat(c.h),
+            low: parseFloat(c.l),
+            close: parseFloat(c.c),
+            volume: parseFloat(c.v),
         }));
 
         return { closes, data };
     } catch (error) {
-        console.error(`[Cron Monitor] Error fetching candles for ${symbol}:`, error);
+        console.error(`[Cron Monitor] Error fetching ${interval} candles for ${symbol}:`, error);
         return null;
     }
 }
 
 /**
- * Quick momentum check using RSI and MACD
+ * Quick momentum check using RSI and MACD from the engine
  * Returns true if momentum is still aligned with trade direction
+ * v4.1: Loosened thresholds to reduce premature exits from noise
  */
 function checkMomentumAligned(closes: number[], direction: 'LONG' | 'SHORT'): { aligned: boolean; reason: string } {
     if (closes.length < 30) {
         return { aligned: true, reason: 'Insufficient data, allowing trade to continue' };
     }
 
-    // Calculate RSI (simplified inline version)
-    const period = 14;
-    const gains: number[] = [];
-    const losses: number[] = [];
+    // Use the same engine calculations that generated the signal
+    const rsiResult = RSI(closes, 14);
+    const macdResult = MACD(closes, 12, 26, 9);
 
-    for (let i = 1; i < closes.length; i++) {
-        const change = closes[i] - closes[i - 1];
-        gains.push(change > 0 ? change : 0);
-        losses.push(change < 0 ? Math.abs(change) : 0);
-    }
-
-    const recentGains = gains.slice(-period);
-    const recentLosses = losses.slice(-period);
-    const avgGain = recentGains.reduce((a, b) => a + b, 0) / period;
-    const avgLoss = recentLosses.reduce((a, b) => a + b, 0) / period;
-    const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-    const rsi = 100 - (100 / (1 + rs));
-
-    // Calculate MACD trend (simplified)
-    const ema12 = closes.slice(-12).reduce((a, b) => a + b, 0) / 12;
-    const ema26 = closes.slice(-26).reduce((a, b) => a + b, 0) / 26;
-    const macdLine = ema12 - ema26;
-    const prevEma12 = closes.slice(-13, -1).reduce((a, b) => a + b, 0) / 12;
-    const prevEma26 = closes.slice(-27, -1).reduce((a, b) => a + b, 0) / 26;
-    const prevMacd = prevEma12 - prevEma26;
-    const macdTrending = macdLine > prevMacd ? 'up' : 'down';
+    const rsi = rsiResult.value;
+    const macdTrending = macdResult.histogram > 0 ? 'up' : 'down';
+    const macdLine = macdResult.macd;
 
     // Check alignment based on direction
     if (direction === 'LONG') {
-        // For LONG: momentum fading if RSI dropping from overbought OR MACD turning down
-        const rsiWeakening = rsi < 45;
+        // v4.1: Loosened from rsi < 45 → rsi < 40 to avoid premature exits
+        const rsiWeakening = rsi < 40;
         const macdWeakening = macdTrending === 'down' && macdLine < 0;
 
         if (rsiWeakening && macdWeakening) {
@@ -130,8 +112,8 @@ function checkMomentumAligned(closes: number[], direction: 'LONG' | 'SHORT'): { 
         }
         return { aligned: true, reason: `RSI=${rsi.toFixed(0)}, MACD ${macdTrending} - momentum intact` };
     } else {
-        // For SHORT: momentum fading if RSI rising from oversold OR MACD turning up  
-        const rsiWeakening = rsi > 55;
+        // v4.1: Loosened from rsi > 55 → rsi > 60 to avoid premature exits
+        const rsiWeakening = rsi > 60;
         const macdWeakening = macdTrending === 'up' && macdLine > 0;
 
         if (rsiWeakening && macdWeakening) {
@@ -140,6 +122,46 @@ function checkMomentumAligned(closes: number[], direction: 'LONG' | 'SHORT'): { 
         return { aligned: true, reason: `RSI=${rsi.toFixed(0)}, MACD ${macdTrending} - momentum intact` };
     }
 }
+
+/**
+ * v4.1: Dual-timeframe momentum check
+ * Fetches both 1h and 4h candles — exit only when BOTH show fading momentum.
+ * This prevents premature exits from short-term noise on a single timeframe.
+ */
+async function checkDualTimeframeMomentum(
+    coin: string,
+    direction: 'LONG' | 'SHORT'
+): Promise<{ shouldExit: boolean; reason: string }> {
+    // Fetch both timeframes in parallel
+    const [candles1h, candles4h] = await Promise.all([
+        fetchRecentCandles(coin, 50, '1h'),
+        fetchRecentCandles(coin, 50, '4h'),
+    ]);
+
+    // If we can't get either timeframe, don't exit (conservative)
+    if (!candles1h && !candles4h) {
+        return { shouldExit: false, reason: 'Could not fetch candle data for momentum check' };
+    }
+
+    const result1h = candles1h ? checkMomentumAligned(candles1h.closes, direction) : { aligned: true, reason: 'No 1h data' };
+    const result4h = candles4h ? checkMomentumAligned(candles4h.closes, direction) : { aligned: true, reason: 'No 4h data' };
+
+    // Only exit if BOTH timeframes show fading momentum (dual confirmation)
+    if (!result1h.aligned && !result4h.aligned) {
+        return {
+            shouldExit: true,
+            reason: `Dual-TF exit: 1h(${result1h.reason}) + 4h(${result4h.reason})`,
+        };
+    }
+
+    // At least one timeframe still shows momentum — let it run
+    const holdReason = result1h.aligned ? `1h: ${result1h.reason}` : `4h: ${result4h.reason}`;
+    return {
+        shouldExit: false,
+        reason: `Momentum intact on at least one TF — ${holdReason}`,
+    };
+}
+
 
 /**
  * Check if a signal hit SL or TP
@@ -187,19 +209,16 @@ async function checkSignalOutcome(
         }
 
         // Hit 3% threshold - check momentum before exiting
+        // v4.1: Dual-timeframe confirmation (1h + 4h) to avoid premature exits
         if (profitPct >= WIN_THRESHOLD_PCT) {
-            const candles = await fetchRecentCandles(coin);
-            if (candles) {
-                const { aligned, reason } = checkMomentumAligned(candles.closes, 'LONG');
-                console.log(`[Monitor] ${coin} LONG at +${profitPct.toFixed(2)}%: ${reason}`);
+            const { shouldExit, reason } = await checkDualTimeframeMomentum(coin, 'LONG');
+            console.log(`[Monitor] ${coin} LONG at +${profitPct.toFixed(2)}%: ${reason}`);
 
-                if (!aligned) {
-                    // Momentum fading, take profit now
-                    return { hit: true, outcome: 'WON', exitReason: 'MOMENTUM_EXIT', profitPct };
-                }
-                // Momentum still strong, let it run to TP
+            if (shouldExit) {
+                // Both timeframes confirm momentum fading — take profit
+                return { hit: true, outcome: 'WON', exitReason: 'MOMENTUM_EXIT', profitPct };
             }
-            // If candle fetch failed, fall through to let trade continue
+            // At least one TF still shows momentum — let it run to TP
         }
 
         // Hit SL
@@ -218,19 +237,16 @@ async function checkSignalOutcome(
         }
 
         // Hit 3% threshold - check momentum before exiting
+        // v4.1: Dual-timeframe confirmation (1h + 4h) to avoid premature exits
         if (profitPct >= WIN_THRESHOLD_PCT) {
-            const candles = await fetchRecentCandles(coin);
-            if (candles) {
-                const { aligned, reason } = checkMomentumAligned(candles.closes, 'SHORT');
-                console.log(`[Monitor] ${coin} SHORT at +${profitPct.toFixed(2)}%: ${reason}`);
+            const { shouldExit, reason } = await checkDualTimeframeMomentum(coin, 'SHORT');
+            console.log(`[Monitor] ${coin} SHORT at +${profitPct.toFixed(2)}%: ${reason}`);
 
-                if (!aligned) {
-                    // Momentum fading, take profit now
-                    return { hit: true, outcome: 'WON', exitReason: 'MOMENTUM_EXIT', profitPct };
-                }
-                // Momentum still strong, let it run to TP
+            if (shouldExit) {
+                // Both timeframes confirm momentum fading — take profit
+                return { hit: true, outcome: 'WON', exitReason: 'MOMENTUM_EXIT', profitPct };
             }
-            // If candle fetch failed, fall through to let trade continue
+            // At least one TF still shows momentum — let it run to TP
         }
 
         // Hit SL

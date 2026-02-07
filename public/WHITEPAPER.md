@@ -60,7 +60,7 @@ Everything on this platform is free, forever. If you want dedicated *paid* work 
 
 The flagship research platform you're looking at right now. It aggregates data from multiple sources (Binance, Hyperliquid, Alternative.me), processes it through the Lisan Core Engine, and presents actionable signals with confidence scores.
 
-**What it is:** A research tool. A decision-support system. A way to see the market through 14 different quantitative lenses at once.
+**What it is:** A research tool. A decision-support system. A way to see the market through 17 different quantitative lenses at once.
 
 **What it is NOT:** A trading bot. An automated system that executes trades on your behalf. Financial advice. A guarantee of profits. A crystal ball.
 
@@ -68,11 +68,11 @@ The flagship research platform you're looking at right now. It aggregates data f
 
 The algorithmic backbone of everything. A quantitative signal generation system that analyzes cryptocurrency markets using a weighted multi-indicator scoring algorithm. It works in four stages:
 
-1. **Data Ingestion** — Collects OHLCV (Open, High, Low, Close, Volume) price data, sentiment data from the Fear & Greed Index, and derivatives data (funding rates, open interest) from perpetual exchanges.
+1. **Data Ingestion** — Collects OHLCV (Open, High, Low, Close, Volume) price data, sentiment data from the Fear & Greed Index, and derivatives data (funding rates, open interest, basis premium, volume) from Hyperliquid.
 
-2. **Indicator Calculation** — Computes 14 technical indicators across 4 categories: Momentum, Trend, Volume, and Sentiment/Volatility. Each indicator produces a value, a signal (bullish/bearish/neutral), and a strength score (0.0 to 1.0).
+2. **Indicator Calculation** — Computes 17 technical indicators across 6 categories: Momentum, Trend, Volume, Volatility, Sentiment, and Positioning. Each indicator produces a value, a signal (bullish/bearish/neutral), and a strength score (0.0 to 1.0).
 
-3. **Signal Scoring** — Aggregates all indicator scores into a single 0-100 confidence score, with a directional classification: LONG (bullish setup), SHORT (bearish setup), or HOLD (no clear edge).
+3. **Signal Scoring** — Aggregates all indicator scores into a single 0-100 confidence score, with a directional classification: LONG (bullish setup), SHORT (bearish setup), or HOLD (no clear edge). v4.1 includes cluster agreement penalty and market regime-adaptive thresholds.
 
 4. **Risk Computation** — Calculates ATR-based stop loss and take profit levels for every signal, ensuring a consistent 1:2 risk-to-reward ratio.
 
@@ -100,7 +100,7 @@ So I curated a list. These are assets with deep liquidity, significant trading v
 
 ---
 
-## The 14 Indicators — Complete Breakdown
+## The 17 Indicators — Complete Breakdown
 
 Every indicator in the engine outputs three things:
 
@@ -151,33 +151,51 @@ Price relative to 2 standard deviations from the mean. At the lower band = poten
 
 ---
 
-### Volume Cluster (20 points)
+### Volume Cluster (16 points)
 
 Volume is the fuel for price movement. A breakout without volume is suspect. A breakout WITH volume has conviction. These indicators confirm whether the move is real.
 
 #### OBV Trend — On-Balance Volume (10 pts)
 Cumulative volume flow. If price is rising and OBV is rising = healthy trend, accumulation happening. If price is rising but OBV is falling = divergence, distribution happening. Divergences often signal reversals.
 
-#### Volume Ratio (10 pts)
+#### Volume Ratio (6 pts)
 Current volume relative to the 20-period average. Above 1.5x = significant volume, high conviction move. We don't trust breakouts that happen on average or below-average volume.
 
 ---
 
-### Sentiment & Volatility (30 points)
+### Volatility Cluster (10 points)
 
-The market is people. And people are emotional. These indicators measure fear, greed, and statistical extremes.
+Statistical measure of price deviation from the norm. Mean reversion is a powerful force — extreme moves tend to snap back.
 
-#### Fear & Greed Index (15 pts)
-Aggregated market sentiment from multiple sources. Below 25 = Extreme Fear (historically a buying opportunity — "be greedy when others are fearful"). Above 75 = Extreme Greed (historically time to be cautious — "be fearful when others are greedy"). This is a contrarian indicator.
-
-#### Z-Score (15 pts)
-Statistical measure of how far price has deviated from the mean. Below -2 = price is 2+ standard deviations below average (statistically oversold). Above +2 = statistically overbought. Mean reversion is a powerful force.
+#### Z-Score (10 pts)
+Measures how far price has deviated from the mean. Below -2 = price is 2+ standard deviations below average (statistically oversold). Above +2 = statistically overbought.
 
 ---
 
-### Hyperliquid Funding Rate Adjustment
+### Sentiment Cluster (8 points)
 
-After the base score is calculated, we apply a post-scoring adjustment based on live funding rate data from Hyperliquid. If funding confirms direction (e.g., crowded shorts + LONG signal), we add **+5 points**. If funding contradicts direction, we subtract **-3 points**. The asymmetry is intentional — confirmation is weighted more heavily than conflict.
+The market is people. And people are emotional. This contrarian indicator measures crowd psychology extremes.
+
+#### Fear & Greed Index (8 pts)
+Aggregated market sentiment from multiple sources. Below 25 = Extreme Fear (historically a buying opportunity — "be greedy when others are fearful"). Above 75 = Extreme Greed (historically time to be cautious — "be fearful when others are greedy"). This is a contrarian indicator.
+
+---
+
+### Positioning Cluster (16 points)
+
+v4.1 introduced a full Positioning Cluster — live Hyperliquid institutional data as first-class weighted indicators. Where is the crowd positioned? Crowded trades tend to unwind violently.
+
+#### Funding Rate (6 pts)
+Hourly funding rate from Hyperliquid, annualized to gauge directional crowding. Extreme negative funding (crowded shorts) is bullish. Extreme positive funding (crowded longs) is bearish. Includes a velocity boost: rapidly changing funding is amplified, while stable near-neutral funding is dampened.
+
+#### Open Interest Change (4 pts)
+Measures changes in open interest relative to price action. OI surging with price = trend confirmation. OI surging against price = divergence warning. Uses real historical OI from stored snapshots for accurate comparison.
+
+#### Basis Premium (3 pts)
+Mark-to-index spread from Hyperliquid. A large positive basis (mark > index) suggests aggressive long positioning (contrarian bearish). Large negative basis suggests oversold conditions (contrarian bullish).
+
+#### HL Volume Momentum (3 pts)
+Compares current 24h Hyperliquid volume to a rolling 7-day average. Volume surges (2x+ average) during breakouts confirm the move. Low volume on moves suggests fakeouts.
 
 ---
 
@@ -186,31 +204,33 @@ After the base score is calculated, we apply a post-scoring adjustment based on 
 The algorithm is straightforward. No black boxes. Here's exactly how a signal is generated:
 
 ```
-// For each of the 14 indicators:
+// For each of the 17 indicators:
 points = weight × strength
 
 if (signal === 'bullish') totalBullish += points
 if (signal === 'bearish') totalBearish += points
 
-// Calculate direction and score:
-directionalBias = totalBullish - totalBearish
-totalScore = totalBullish + totalBearish
-normalizedScore = (totalScore / maxPossible) × 100
+// v4.1: Cluster agreement penalizes contradictory signals
+agreement = agreementRatio(bullishCount, bearishCount)
+normalizedScore = (totalScore / maxPossible) × 100 × agreement
 
-// Classification:
-if (directionalBias > totalScore × 0.10 AND normalizedScore >= 35)
+// v4.1: Classification (threshold adapts to market regime):
+scoreThreshold = 50 × regimeMultiplier
+// e.g. 45 in bull trend, 65 in choppy markets
+
+if (directionalBias > totalScore × 0.15 AND normalizedScore >= scoreThreshold)
     direction = LONG
-else if (directionalBias < -totalScore × 0.10 AND normalizedScore >= 35)
+else if (directionalBias < -totalScore × 0.15 AND normalizedScore >= scoreThreshold)
     direction = SHORT
 else
     direction = HOLD
 ```
 
-**Why 10% directional bias threshold?**
-Because 51% bullish vs 49% bearish isn't a signal — it's a coin flip. We require a clear directional edge before emitting a LONG or SHORT signal. If the indicators are split, that's a HOLD.
+**Why 15% directional bias threshold?**
+v4.1 raised this from 10% to 15%. Because 55% bullish vs 45% bearish isn't conviction — it's noise. We require a clear directional edge before emitting a LONG or SHORT signal. If the indicators are split, that's a HOLD.
 
-**Why 35 minimum score?**
-A score below 35 means most indicators are neutral or weak. Even if there's a directional bias, there's no confluence. We don't trade on weak setups.
+**Why ~50 minimum score?**
+The base threshold is 50. In v4.1, market regime detection adjusts this automatically: in choppy markets the threshold rises to ~65 to filter noise, while in clear trends it drops to ~45. This lets the engine be more selective when conditions are uncertain and more responsive when conditions are clear.
 
 ---
 
@@ -236,22 +256,23 @@ This ratio means you're risking 1 unit to gain 2 units. At this ratio, you only 
 
 The math is on your side — *if you follow the system*. The moment you move your stop loss, double down on a loser, or take profits early because you're nervous, you break the math.
 
-### Smart Exit Strategy — Momentum Re-Evaluation
+### Smart Exit Strategy — Dual-Timeframe Momentum Re-Evaluation
 
-When a trade reaches **+3% profit**, the engine doesn't exit immediately. Instead, it fetches fresh market data and re-evaluates momentum:
+When a trade reaches **+3% profit**, the engine doesn't exit immediately. Instead, it fetches fresh candle data on **two timeframes (1h and 4h)** and re-evaluates RSI and MACD momentum on each:
 
-- **Momentum still aligned** — RSI and MACD confirm trend direction → Let it run to full ATR-based take profit
-- **Momentum fading** — Indicators show reversal signals → Take profit at current level
+- **Both timeframes aligned** — RSI and MACD still confirm trend direction → Let it run to full ATR-based take profit
+- **Both timeframes fading** — 1h AND 4h show reversal signals → Take profit at current level
+- **Mixed signals** — Only one timeframe weakening → Stay in trade (single-timeframe noise, not conviction)
 
-This prevents cutting winners short while still protecting gains when momentum shifts. The engine makes this decision automatically during the 24/7 monitoring cycle.
+v4.1 requires dual confirmation to exit — this prevents cutting winners short due to noise on a single timeframe. Candle data is fetched from Binance with Hyperliquid fallback for assets not listed on Binance.
 
 ---
 
 ## Self-Learning System — Adaptive Weights
 
-Static systems die. Markets evolve. What worked in 2021 doesn't work in 2024. The Lisan Core Engine adapts.
+Static systems die. Markets evolve. What worked in 2021 doesn't work in 2025. The Lisan Core Engine adapts.
 
-Every signal generated is stored with its full indicator snapshot — every value, every weight used at the time. When the signal resolves (hits take profit, hits stop loss, or times out), we record the outcome.
+Every signal generated is stored with its full indicator snapshot — every value, every weight used at the time. When the signal resolves (hits take profit or hits stop loss), we record the outcome.
 
 ### Learning Trigger: 3 Consecutive Losses
 
@@ -270,7 +291,35 @@ When the engine generates 3 LONG or SHORT signals in a row that hit their stop l
 - **Minimum**: 1 point — No indicator can ever be fully disabled.
 - **Maximum**: 20 points — No single indicator can dominate the entire scoring.
 
-This prevents extreme drift. The system adapts, but within sane boundaries.
+This prevents extreme drift. The system adapts, but within sane boundaries. After adjustments, weights are renormalized to sum to exactly 100 points, preserving proportional relationships.
+
+### v4.1: Win Boost — Bidirectional Learning
+
+The engine doesn't just penalize failures — it also rewards success. When 3 consecutive wins are detected, a win-boost cycle triggers:
+
+- **Identify high-performing indicators** — Which indicators were correctly confident in winning trades?
+- **Boost their weights** — Up to 10% per cycle (conservative, prevents runaway growth)
+- **60% correctness threshold** — An indicator must appear correctly in at least 60% of winning signals to qualify
+
+This ensures the system converges toward what actually works, not just away from what doesn't.
+
+### Weight Recovery — Gradual Return to Defaults
+
+Penalized weights don't stay penalized forever. After 20 trades where an indicator does NOT appear in losing signals, we recover 5% of the gap toward its default weight. This prevents permanent over-penalization during unusual market conditions.
+
+---
+
+## Market Regime Detection
+
+v4.1 introduced market regime detection — the engine classifies the current market environment before generating signals:
+
+- **BULL_TREND** — BTC trending up, altcoins following, normal OI growth → Lower score threshold (~45), slight long bias
+- **BEAR_TREND** — BTC trending down, widespread alt decline → Lower threshold (~45), slight short bias
+- **HIGH_VOL_CHOP** — High volatility, no clear direction, extreme funding → Stricter threshold (~65), no bias
+- **ACCUMULATION** — Flat price action, OI building, compressed volatility → Normal threshold, no bias
+- **UNKNOWN** — Insufficient data or mixed signals → Default thresholds, no adjustments
+
+Regime classification uses BTC OHLCV data, real altcoin price changes, average funding rates, and average OI changes from stored market snapshots.
 
 ---
 
@@ -282,9 +331,12 @@ Transparency matters. Here's exactly where the engine gets its data:
 |-----------|--------|-----------|
 | OHLCV Price Data | Binance Public API (no auth required) | 5 minutes |
 | HYPE Token Data | Hyperliquid Candle API | 5 minutes |
-| Fear & Greed Index | Alternative.me | 1 hour |
+| Fear & Greed Index | Alternative.me (with Supabase cache fallback) | 1 hour |
 | Funding Rates | Hyperliquid Meta API | 30 seconds |
 | Open Interest | Hyperliquid Meta API | 30 seconds |
+| Basis Premium | Hyperliquid Meta API | 30 seconds |
+| 24h Volume | Hyperliquid Meta API | 30 seconds |
+| Market Snapshots | Supabase (historical OI, volume, funding) | Per-run |
 
 All API calls happen server-side. Your browser never contacts these APIs directly. This protects rate limits and keeps the architecture clean.
 
@@ -333,4 +385,4 @@ Do your own research. Use this as one input among many. And for the love of god,
 
 ---
 
-*Version 3.1.16 — February 2026 — Admin Governance & Signal Fidelity — LISAN HOLDINGS*
+*Version 4.1.1 — February 2026 — Production Accuracy Audit — LISAN HOLDINGS*

@@ -1,8 +1,8 @@
 /**
  * CRON: Learning Cycle
  * 
- * Analyzes GLOBAL signal performance and adjusts shared weights
- * when there are consecutive losses.
+ * v4.1: Bidirectional — analyzes GLOBAL signal performance and
+ * adjusts shared weights on both consecutive losses AND wins.
  * 
  * Called every hour by external cron service.
  */
@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/lib/logger';
 import {
     findUnprocessedLossStreak,
+    findUnprocessedWinStreak,
     getGlobalWeights,
     updateGlobalWeights,
     supabaseServer,
@@ -43,6 +44,8 @@ const LEARNING_CONFIG = {
     minWeight: 1,               // Minimum weight
     maxWeight: 20,              // Maximum weight
     consecutiveLossThreshold: 3, // Losses to trigger learning
+    consecutiveWinThreshold: 3,  // v4.1: Wins to trigger boost
+    maxWinBoost: 10,             // v4.1: Max % boost per win cycle (conservative)
     // Phase 4: Weight recovery settings
     recoveryThreshold: 20,       // Trades without indicator loss before recovery starts
     recoveryRate: 0.05,          // Recover 5% of lost weight per check
@@ -54,6 +57,57 @@ const LEARNING_CONFIG = {
 // ============================================================================
 // GLOBAL LEARNING FUNCTIONS
 // ============================================================================
+
+/**
+ * #9 FIX: Renormalize weights to sum to 100 while preserving ratios.
+ * Without this, weights drift from the 100-point total after repeated adjustments.
+ * Uses iterative approach: scale → clamp → redistribute remainder.
+ */
+function normalizeWeights(weights: IndicatorWeights): IndicatorWeights {
+    const keys = Object.keys(weights) as (keyof IndicatorWeights)[];
+    const total = keys.reduce((sum, k) => sum + weights[k], 0);
+    if (total === 0 || Math.abs(total - 100) < 0.01) return weights;
+
+    const normalized = { ...weights };
+
+    // Step 1: Scale all weights proportionally
+    const scale = 100 / total;
+    for (const key of keys) {
+        normalized[key] = normalized[key] * scale;
+    }
+
+    // Step 2: Clamp to min/max bounds and track remainder
+    let clampedSum = 0;
+    let unclampedSum = 0;
+    const unclampedKeys: (keyof IndicatorWeights)[] = [];
+
+    for (const key of keys) {
+        if (normalized[key] < LEARNING_CONFIG.minWeight) {
+            normalized[key] = LEARNING_CONFIG.minWeight;
+            clampedSum += LEARNING_CONFIG.minWeight;
+        } else if (normalized[key] > LEARNING_CONFIG.maxWeight) {
+            normalized[key] = LEARNING_CONFIG.maxWeight;
+            clampedSum += LEARNING_CONFIG.maxWeight;
+        } else {
+            unclampedKeys.push(key);
+            unclampedSum += normalized[key];
+        }
+    }
+
+    // Step 3: Redistribute remainder across unclamped weights
+    const target = 100 - clampedSum;
+    if (unclampedKeys.length > 0 && unclampedSum > 0) {
+        const redistributScale = target / unclampedSum;
+        for (const key of unclampedKeys) {
+            normalized[key] = Math.max(
+                LEARNING_CONFIG.minWeight,
+                Math.min(LEARNING_CONFIG.maxWeight, normalized[key] * redistributScale)
+            );
+        }
+    }
+
+    return normalized;
+}
 
 /**
  * Get recent losing signals (global)
@@ -95,6 +149,12 @@ function analyzeLosingSignals(
         obvTrend: 'obvTrend',
         volumeRatio: 'volumeRatio',
         zScore: 'zScore',
+        // v4.1: Previously missing — these 5 indicators (24pts) were invisible to learning
+        fearGreed: 'fearGreed',
+        fundingRate: 'fundingRate',
+        oiChange: 'oiChange',
+        basisPremium: 'basisPremium',
+        hlVolume: 'hlVolume',
     };
 
     for (const signal of losingSignals) {
@@ -150,6 +210,38 @@ function analyzeLosingSignals(
             if (name === 'obvTrend' || name === 'volumeRatio') {
                 if (direction === 'LONG' && value > 1) wasWronglyConfident = true;
                 if (direction === 'SHORT' && value < 1) wasWronglyConfident = true;
+            }
+
+            // Fear & Greed: high greed on LONG that lost = wrongly confident
+            if (name === 'fearGreed') {
+                if (direction === 'LONG' && value > 60) wasWronglyConfident = true;  // Greedy LONG lost
+                if (direction === 'SHORT' && value < 40) wasWronglyConfident = true; // Fearful SHORT lost
+            }
+
+            // Funding Rate (contrarian): positive value = crowded longs = bearish signal
+            if (name === 'fundingRate') {
+                // If LONG lost and funding was negative (bearish crowd = bullish signal), funding was wrong
+                if (direction === 'LONG' && value < 0) wasWronglyConfident = true;
+                // If SHORT lost and funding was positive (bullish crowd = bearish signal), funding was wrong
+                if (direction === 'SHORT' && value > 0) wasWronglyConfident = true;
+            }
+
+            // OI Change: positive = bullish signal
+            if (name === 'oiChange') {
+                if (direction === 'LONG' && value > 0) wasWronglyConfident = true;
+                if (direction === 'SHORT' && value < 0) wasWronglyConfident = true;
+            }
+
+            // Basis Premium (contrarian): positive premium = crowded longs = bearish
+            if (name === 'basisPremium') {
+                if (direction === 'LONG' && value < 0) wasWronglyConfident = true;  // Negative premium = bullish signal, but LONG lost
+                if (direction === 'SHORT' && value > 0) wasWronglyConfident = true; // Positive premium = bearish signal, but SHORT lost
+            }
+
+            // HL Volume: ratio > 1.5 with price move = conviction signal
+            if (name === 'hlVolume') {
+                if (direction === 'LONG' && value > 1.5) wasWronglyConfident = true;  // Volume confirmed but LONG lost
+                if (direction === 'SHORT' && value > 1.5) wasWronglyConfident = true; // Volume confirmed but SHORT lost
             }
 
             if (wasWronglyConfident) {
@@ -240,6 +332,9 @@ async function runGlobalLearningCycle(): Promise<{
 
     if (adjustments.length > 0) {
         // Update global weights
+        // #9 FIX: Renormalize to maintain 100-point total
+        const normalizedWeights = normalizeWeights(currentWeights);
+        Object.assign(currentWeights, normalizedWeights);
         await updateGlobalWeights(currentWeights as unknown as Record<string, number>);
 
         // Calculate the learning event timestamp: 100ms after the 3rd loss
@@ -267,8 +362,250 @@ async function runGlobalLearningCycle(): Promise<{
 }
 
 // ============================================================================
-// WEIGHT RECOVERY SYSTEM
+// v4.1: BIDIRECTIONAL LEARNING — WIN BOOST
 // ============================================================================
+
+/**
+ * Get recent winning signals (global)
+ */
+async function getRecentWinningSignals(limit: number = 20) {
+    const { data, error } = await supabaseServer
+        .from('signals')
+        .select('*')
+        .eq('outcome', 'WON')
+        .order('closed_at', { ascending: false })
+        .limit(limit);
+
+    if (error) {
+        log.error('Failed to fetch winning signals', error);
+        return [];
+    }
+
+    return data || [];
+}
+
+/**
+ * Analyze winning signals to find indicators that correctly predicted direction.
+ * This is the inverse of analyzeLosingSignals.
+ */
+function analyzeWinningSignals(
+    winningSignals: Array<{ direction: string; indicator_snapshot: Record<string, number> }>
+): Map<keyof IndicatorWeights, { correctCount: number; avgConfidence: number }> {
+    const indicatorStats = new Map<keyof IndicatorWeights, { correctCount: number; totalConfidence: number }>();
+
+    const indicatorToWeight: Record<string, keyof IndicatorWeights> = {
+        rsi: 'rsi',
+        stochRSI: 'stochRSI',
+        macd: 'macd',
+        williamsR: 'williamsR',
+        cci: 'cci',
+        emaAlignment: 'emaAlignment',
+        ichimoku: 'ichimoku',
+        adx: 'adx',
+        bollinger: 'bollinger',
+        obvTrend: 'obvTrend',
+        volumeRatio: 'volumeRatio',
+        zScore: 'zScore',
+        // v4.1: Previously missing — these 5 indicators (24pts) were invisible to learning
+        fearGreed: 'fearGreed',
+        fundingRate: 'fundingRate',
+        oiChange: 'oiChange',
+        basisPremium: 'basisPremium',
+        hlVolume: 'hlVolume',
+    };
+
+    for (const signal of winningSignals) {
+        const direction = signal.direction;
+        const indicators = signal.indicator_snapshot || {};
+
+        for (const [name, weightKey] of Object.entries(indicatorToWeight)) {
+            const value = indicators[name];
+            if (value === undefined) continue;
+
+            let wasCorrectlyConfident = false;
+
+            // RSI: correctly signaled direction
+            if (name === 'rsi') {
+                if (direction === 'LONG' && value > 50) wasCorrectlyConfident = true;
+                if (direction === 'SHORT' && value < 50) wasCorrectlyConfident = true;
+            }
+
+            // MACD: histogram aligned with direction
+            if (name === 'macd') {
+                if (direction === 'LONG' && value > 0) wasCorrectlyConfident = true;
+                if (direction === 'SHORT' && value < 0) wasCorrectlyConfident = true;
+            }
+
+            // EMA Alignment
+            if (name === 'emaAlignment') {
+                if (direction === 'LONG' && value > 50) wasCorrectlyConfident = true;
+                if (direction === 'SHORT' && value < 50) wasCorrectlyConfident = true;
+            }
+
+            // Ichimoku
+            if (name === 'ichimoku') {
+                if (direction === 'LONG' && value > 0) wasCorrectlyConfident = true;
+                if (direction === 'SHORT' && value < 0) wasCorrectlyConfident = true;
+            }
+
+            // ADX: direction aligned
+            if (name === 'adx' && value > 25) {
+                const plusDI = indicators['plusDI'];
+                const minusDI = indicators['minusDI'];
+                if (plusDI !== undefined && minusDI !== undefined) {
+                    const adxDirection = plusDI > minusDI ? 'LONG' : 'SHORT';
+                    if (adxDirection === direction) wasCorrectlyConfident = true;
+                }
+            }
+
+            // Volume
+            if (name === 'obvTrend' || name === 'volumeRatio') {
+                if (direction === 'LONG' && value > 1) wasCorrectlyConfident = true;
+                if (direction === 'SHORT' && value < 1) wasCorrectlyConfident = true;
+            }
+
+            // Fear & Greed: greedy on winning LONG = correctly confident
+            if (name === 'fearGreed') {
+                if (direction === 'LONG' && value > 60) wasCorrectlyConfident = true;
+                if (direction === 'SHORT' && value < 40) wasCorrectlyConfident = true;
+            }
+
+            // Funding Rate (contrarian)
+            if (name === 'fundingRate') {
+                if (direction === 'LONG' && value < 0) wasCorrectlyConfident = true;
+                if (direction === 'SHORT' && value > 0) wasCorrectlyConfident = true;
+            }
+
+            // OI Change
+            if (name === 'oiChange') {
+                if (direction === 'LONG' && value > 0) wasCorrectlyConfident = true;
+                if (direction === 'SHORT' && value < 0) wasCorrectlyConfident = true;
+            }
+
+            // Basis Premium (contrarian)
+            if (name === 'basisPremium') {
+                if (direction === 'LONG' && value < 0) wasCorrectlyConfident = true;
+                if (direction === 'SHORT' && value > 0) wasCorrectlyConfident = true;
+            }
+
+            // HL Volume
+            if (name === 'hlVolume') {
+                if (direction === 'LONG' && value > 1.5) wasCorrectlyConfident = true;
+                if (direction === 'SHORT' && value > 1.5) wasCorrectlyConfident = true;
+            }
+
+            if (wasCorrectlyConfident) {
+                const existing = indicatorStats.get(weightKey) || { correctCount: 0, totalConfidence: 0 };
+                existing.correctCount++;
+                existing.totalConfidence += Math.abs(value);
+                indicatorStats.set(weightKey, existing);
+            }
+        }
+    }
+
+    const result = new Map<keyof IndicatorWeights, { correctCount: number; avgConfidence: number }>();
+    for (const [key, stats] of indicatorStats.entries()) {
+        result.set(key, {
+            correctCount: stats.correctCount,
+            avgConfidence: stats.correctCount > 0 ? stats.totalConfidence / stats.correctCount : 0,
+        });
+    }
+
+    return result;
+}
+
+/**
+ * v4.1: Run GLOBAL win-boost cycle
+ * Inverse of loss learning — boosts indicators that consistently predicted correctly.
+ */
+async function runGlobalWinBoostCycle(): Promise<{
+    triggered: boolean;
+    consecutiveWins: number;
+    adjustments: WeightAdjustment[];
+}> {
+    const winStreak = await findUnprocessedWinStreak();
+    const consecutiveWins = winStreak.count;
+
+    log.debug(`Win streak found: ${consecutiveWins} consecutive wins`, {
+        signalIds: winStreak.signalIds,
+        threshold: LEARNING_CONFIG.consecutiveWinThreshold,
+    });
+
+    if (consecutiveWins < LEARNING_CONFIG.consecutiveWinThreshold) {
+        return { triggered: false, consecutiveWins, adjustments: [] };
+    }
+
+    const winningSignals = await getRecentWinningSignals(20);
+
+    if (winningSignals.length === 0) {
+        return { triggered: false, consecutiveWins, adjustments: [] };
+    }
+
+    const indicatorAnalysis = analyzeWinningSignals(winningSignals);
+
+    const storedWeights = await getGlobalWeights();
+    const currentWeights: IndicatorWeights = storedWeights
+        ? { ...DEFAULT_WEIGHTS, ...storedWeights } as IndicatorWeights
+        : { ...DEFAULT_WEIGHTS };
+
+    const adjustments: WeightAdjustment[] = [];
+
+    for (const [indicator, stats] of indicatorAnalysis.entries()) {
+        const correctRatio = stats.correctCount / winningSignals.length;
+
+        if (correctRatio >= 0.6) { // 60%+ correct across wins
+            const boost = Math.min(
+                LEARNING_CONFIG.maxWinBoost,
+                correctRatio * LEARNING_CONFIG.maxWinBoost
+            );
+
+            const oldWeight = currentWeights[indicator];
+            const newWeight = Math.min(
+                LEARNING_CONFIG.maxWeight,
+                oldWeight * (1 + boost / 100)
+            );
+
+            if (Math.abs(newWeight - oldWeight) > 0.01) {
+                currentWeights[indicator] = newWeight;
+
+                adjustments.push({
+                    indicator,
+                    oldWeight: Math.round(oldWeight * 100) / 100,
+                    newWeight: Math.round(newWeight * 100) / 100,
+                    changePercent: Math.round(((newWeight - oldWeight) / oldWeight) * 10000) / 100,
+                    reason: `Correct in ${Math.round(correctRatio * 100)}% of ${winningSignals.length} wins`,
+                });
+            }
+        }
+    }
+
+    if (adjustments.length > 0) {
+        // #9 FIX: Renormalize to maintain 100-point total
+        const normalizedWeights = normalizeWeights(currentWeights);
+        Object.assign(currentWeights, normalizedWeights);
+        await updateGlobalWeights(currentWeights as unknown as Record<string, number>);
+
+        const boostEventTime = winStreak.streakEndTime
+            ? new Date(new Date(winStreak.streakEndTime).getTime() + 100).toISOString()
+            : new Date().toISOString();
+
+        await supabaseServer.from('learning_cycles').insert({
+            user_id: null,
+            triggered_by: 'consecutive_wins',
+            signals_analyzed: winningSignals.length,
+            adjustments,
+            consecutive_losses: 0, // It's a win streak, not a loss
+            weights_snapshot: currentWeights,
+            created_at: boostEventTime,
+        });
+    }
+
+    return {
+        triggered: true,
+        consecutiveWins,
+        adjustments,
+    };
+}
 
 /**
  * Check for weights that should be recovered toward defaults
@@ -311,6 +648,9 @@ async function checkWeightRecovery(): Promise<WeightAdjustment[]> {
     }
 
     if (recoveryAdjustments.length > 0) {
+        // #9 FIX: Renormalize to maintain 100-point total
+        const normalizedWeights = normalizeWeights(currentWeights);
+        Object.assign(currentWeights, normalizedWeights);
         await updateGlobalWeights(currentWeights as unknown as Record<string, number>);
         log.info(`Weight recovery: ${recoveryAdjustments.length} indicators recovered`);
     }
@@ -360,7 +700,7 @@ export async function GET(request: NextRequest) {
             const result = await runGlobalLearningCycle();
 
             if (!result.triggered) {
-                log.debug(`Iteration ${i + 1}: No more streaks found`);
+                log.debug(`Loss iteration ${i + 1}: No more streaks found`);
                 break;
             }
 
@@ -369,7 +709,27 @@ export async function GET(request: NextRequest) {
                 adjustments: result.adjustments,
             });
             totalAdjustments += result.adjustments.length;
-            log.debug(`Iteration ${i + 1}: Processed streak of ${result.consecutiveLosses} with ${result.adjustments.length} adjustments`);
+            log.debug(`Loss iteration ${i + 1}: Processed streak of ${result.consecutiveLosses} with ${result.adjustments.length} adjustments`);
+        }
+
+        // v4.1: Process ALL unprocessed win streaks
+        const winResults: { consecutiveWins: number; adjustments: WeightAdjustment[] }[] = [];
+        let totalWinBoosts = 0;
+
+        for (let i = 0; i < MAX_ITERATIONS; i++) {
+            const result = await runGlobalWinBoostCycle();
+
+            if (!result.triggered) {
+                log.debug(`Win iteration ${i + 1}: No more win streaks found`);
+                break;
+            }
+
+            winResults.push({
+                consecutiveWins: result.consecutiveWins,
+                adjustments: result.adjustments,
+            });
+            totalWinBoosts += result.adjustments.length;
+            log.debug(`Win iteration ${i + 1}: Boosted ${result.adjustments.length} indicators from ${result.consecutiveWins} win streak`);
         }
 
         // Build comprehensive response
@@ -380,10 +740,15 @@ export async function GET(request: NextRequest) {
             streaksProcessed: allResults.length,
             totalAdjustments,
             results: allResults.length > 0 ? allResults : undefined,
+            // v4.1: Win boost processing
+            winBoostTriggered: winResults.length > 0,
+            winStreaksProcessed: winResults.length,
+            totalWinBoosts,
+            winResults: winResults.length > 0 ? winResults : undefined,
             // Weight recovery
             recoveryTriggered: recoveryAdjustments.length > 0,
             recoveryAdjustments: recoveryAdjustments.length > 0 ? recoveryAdjustments : undefined,
-            // Proactive monitoring (Phase 4)
+            // Proactive monitoring
             proactiveWarning,
             trailingWinRate: Math.round(trailingStats.winRate * 10) / 10,
             directionalStats: {
@@ -399,10 +764,10 @@ export async function GET(request: NextRequest) {
             duration: Date.now() - startTime,
         };
 
-        if (allResults.length === 0 && recoveryAdjustments.length === 0) {
-            log.debug('No learning or recovery actions taken');
+        if (allResults.length === 0 && recoveryAdjustments.length === 0 && winResults.length === 0) {
+            log.debug('No learning, recovery, or boost actions taken');
         } else {
-            log.info(`Learning complete: ${allResults.length} streaks, ${recoveryAdjustments.length} recoveries`);
+            log.info(`Learning complete: ${allResults.length} loss streaks, ${winResults.length} win boosts, ${recoveryAdjustments.length} recoveries`);
         }
 
         return NextResponse.json(response);

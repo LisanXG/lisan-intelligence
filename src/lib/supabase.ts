@@ -7,7 +7,7 @@
 
 import { createBrowserClient } from '@supabase/ssr';
 import { logger } from '@/lib/logger';
-import type { DbSignal, DbWatchlistItem, DbUserWeights, DbLearningCycle } from '@/lib/types/database';
+import type { DbSignal, DbWatchlistItem, DbUserWeights, DbLearningCycle, ExitReason } from '@/lib/types/database';
 
 // Re-export types for convenience
 export type { DbSignal, DbWatchlistItem, DbUserWeights, DbLearningCycle };
@@ -84,8 +84,8 @@ export async function canAddSignal(
 /**
  * Get all signals (global, not per-user)
  */
-export async function getUserSignals(userId: string): Promise<DbSignal[]> {
-    // Fetch global signals (not per-user anymore)
+export async function getUserSignals(): Promise<DbSignal[]> {
+    // Fetch global signals (not per-user)
     const { data, error } = await supabase
         .from('signals')
         .select('*')
@@ -102,8 +102,8 @@ export async function getUserSignals(userId: string): Promise<DbSignal[]> {
 /**
  * Get open signals (global, not per-user)
  */
-export async function getOpenSignals(userId: string): Promise<DbSignal[]> {
-    // Fetch global pending signals (not per-user anymore)
+export async function getOpenSignals(): Promise<DbSignal[]> {
+    // Fetch global pending signals (not per-user)
     const { data, error } = await supabase
         .from('signals')
         .select('*')
@@ -162,7 +162,7 @@ export async function updateSignalOutcome(
     signalId: string,
     outcome: 'WON' | 'LOST',
     exitPrice: number,
-    exitReason: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT' | 'MANUAL',
+    exitReason: ExitReason,
     profitPct: number
 ): Promise<DbSignal | null> {
     const { data, error } = await supabase
@@ -189,8 +189,8 @@ export async function updateSignalOutcome(
 /**
  * Get tracking statistics for a user
  */
-export async function getTrackingStats(userId: string) {
-    const signals = await getUserSignals(userId);
+export async function getTrackingStats() {
+    const signals = await getUserSignals();
 
     const completed = signals.filter(s => s.outcome !== 'PENDING');
     const open = signals.filter(s => s.outcome === 'PENDING');
@@ -322,12 +322,6 @@ export async function isInWatchlist(userId: string, coin: string): Promise<boole
 // ============================================================================
 // WEIGHTS & LEARNING HELPERS
 // ============================================================================
-
-export async function getUserWeights(userId: string): Promise<Record<string, number> | null> {
-    // Legacy function - now redirects to global weights
-    return getGlobalWeights();
-}
-
 /**
  * Get GLOBAL weights (shared by all users)
  */
@@ -346,15 +340,6 @@ export async function getGlobalWeights(): Promise<Record<string, number> | null>
     return data?.weights || null;
 }
 
-export async function saveUserWeights(
-    userId: string,
-    weights: Record<string, number>
-): Promise<boolean> {
-    // Legacy function - weights are now global
-    // This is a no-op on client side; only server can update global weights
-    logger.debug('saveUserWeights is deprecated - weights are now global');
-    return false;
-}
 
 export async function addLearningCycle(
     userId: string,

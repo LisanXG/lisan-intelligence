@@ -21,7 +21,7 @@ export interface DbSignal {
     take_profit: number;
     outcome: 'PENDING' | 'WON' | 'LOST';
     exit_price?: number;
-    exit_reason?: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT' | 'MANUAL';
+    exit_reason?: ExitReason;
     profit_pct?: number;
     indicator_snapshot: Record<string, number>;
     weights_used: Record<string, number>;

@@ -8,7 +8,7 @@ import {
     getUserSignals,
     getTrackingStats,
     DbSignal,
-    getUserWeights,
+    getGlobalWeights,
     getLearningHistory as getLearningHistoryFromDb,
     DbLearningCycle
 } from '@/lib/supabase';
@@ -55,9 +55,9 @@ export default function LearningPage() {
 
         try {
             const [userSignals, userStats, userWeights, learningHistory] = await Promise.all([
-                getUserSignals(user.id),
-                getTrackingStats(user.id),
-                getUserWeights(user.id),
+                getUserSignals(),
+                getTrackingStats(),
+                getGlobalWeights(),
                 getLearningHistoryFromDb(user.id)
             ]);
             setSignals(userSignals);

@@ -71,7 +71,7 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
 
         try {
             // Get current open signals from Supabase
-            const currentOpenSignals = await getOpenSignals(user.id);
+            const currentOpenSignals = await getOpenSignals();
             setOpenSignals(currentOpenSignals);
 
             // Create a set of existing coin+direction combos that are PENDING
@@ -112,7 +112,7 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
             }
 
             // Refresh open signals
-            const updatedOpenSignals = await getOpenSignals(user.id);
+            const updatedOpenSignals = await getOpenSignals();
             setOpenSignals(updatedOpenSignals);
 
         } catch (err) {

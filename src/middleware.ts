@@ -56,17 +56,6 @@ function isRateLimited(ip: string, path: string, config: RateLimitConfig): boole
     current.count++;
     return false;
 }
-
-// Cleanup old entries every 5 minutes
-setInterval(() => {
-    const now = Date.now();
-    for (const [key, value] of requestCounts.entries()) {
-        if (now > value.resetTime) {
-            requestCounts.delete(key);
-        }
-    }
-}, 300000);
-
 // ============================================================================
 // MIDDLEWARE
 // ============================================================================

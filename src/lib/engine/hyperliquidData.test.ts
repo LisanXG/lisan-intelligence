@@ -8,6 +8,9 @@ import { describe, it, expect } from 'vitest';
 import {
     FundingRateSignal,
     OIChangeSignal,
+    BasisPremiumSignal,
+    HLVolumeMomentumSignal,
+    FundingVelocityBoost,
     calculatePositioningScore,
 } from './hyperliquidData';
 
@@ -159,5 +162,130 @@ describe('calculatePositioningScore', () => {
         const resultHighWeight = calculatePositioningScore(fundingSignal, oiSignal, 12, 8);
 
         expect(resultHighWeight.score).toBeGreaterThan(resultLowWeight.score);
+    });
+
+    it('expands max when basis and volume signals provided', () => {
+        const fundingSignal = { value: 0, signal: 'neutral' as const, strength: 0 };
+        const oiSignal = { value: 0, signal: 'neutral' as const, strength: 0 };
+        const basisSignal = { value: 0.2, signal: 'bearish' as const, strength: 0.5 };
+        const volumeSignal = { value: 2.0, signal: 'bullish' as const, strength: 0.3 };
+
+        const result = calculatePositioningScore(fundingSignal, oiSignal, 6, 4, basisSignal, volumeSignal, 3, 3);
+        expect(result.max).toBe(16); // 6 + 4 + 3 + 3
+    });
+});
+
+// ============================================================================
+// v4.1: BASIS PREMIUM SIGNAL TESTS
+// ============================================================================
+
+describe('BasisPremiumSignal', () => {
+    it('returns bearish when perp trades above spot (crowded longs)', () => {
+        // premium = 0.003 = 0.3% above spot
+        const result = BasisPremiumSignal(0.003);
+        expect(result.signal).toBe('bearish');
+        expect(result.strength).toBeGreaterThan(0);
+    });
+
+    it('returns bullish when perp trades below spot (crowded shorts)', () => {
+        // premium = -0.003 = 0.3% below spot
+        const result = BasisPremiumSignal(-0.003);
+        expect(result.signal).toBe('bullish');
+        expect(result.strength).toBeGreaterThan(0);
+    });
+
+    it('returns neutral for small premium near equilibrium', () => {
+        // premium = 0.0005 = 0.05% (within dead zone)
+        const result = BasisPremiumSignal(0.0005);
+        expect(result.signal).toBe('neutral');
+        expect(result.strength).toBe(0);
+    });
+
+    it('strength caps at 1.0 for extreme premium', () => {
+        // premium = 0.01 = 1% (extreme)
+        const result = BasisPremiumSignal(0.01);
+        expect(result.strength).toBeLessThanOrEqual(1);
+    });
+
+    it('stores premium as percentage in value', () => {
+        const result = BasisPremiumSignal(0.005);
+        expect(result.value).toBe(0.5); // 0.5%
+    });
+});
+
+// ============================================================================
+// v4.1: HL VOLUME MOMENTUM SIGNAL TESTS
+// ============================================================================
+
+describe('HLVolumeMomentumSignal', () => {
+    it('returns bullish for volume surge with rising price', () => {
+        // 2x volume + 3% price rise = conviction
+        const result = HLVolumeMomentumSignal(2000000, 1000000, 3);
+        expect(result.signal).toBe('bullish');
+        expect(result.strength).toBeGreaterThan(0);
+    });
+
+    it('returns bearish for volume surge with falling price', () => {
+        const result = HLVolumeMomentumSignal(2000000, 1000000, -3);
+        expect(result.signal).toBe('bearish');
+        expect(result.strength).toBeGreaterThan(0);
+    });
+
+    it('returns contrarian signal for low volume breakout', () => {
+        // 0.3x volume + 3% price rise = fade the move
+        const result = HLVolumeMomentumSignal(300000, 1000000, 3);
+        expect(result.signal).toBe('bearish'); // Fade the rising price
+        expect(result.strength).toBeLessThanOrEqual(0.5);
+    });
+
+    it('returns neutral when no significant price move', () => {
+        const result = HLVolumeMomentumSignal(2000000, 1000000, 0.5);
+        expect(result.signal).toBe('neutral');
+    });
+
+    it('returns neutral for zero volume', () => {
+        const result = HLVolumeMomentumSignal(0, 1000000, 5);
+        expect(result.signal).toBe('neutral');
+    });
+
+    it('stores volume ratio in value', () => {
+        const result = HLVolumeMomentumSignal(2000000, 1000000, 3);
+        expect(result.value).toBe(2); // 2x ratio
+    });
+});
+
+// ============================================================================
+// v4.1: FUNDING VELOCITY BOOST TESTS
+// ============================================================================
+
+describe('FundingVelocityBoost', () => {
+    it('amplifies signal for rapid funding change', () => {
+        // Funding jumped from 5% to 20% annualized = rapid acceleration
+        const boost = FundingVelocityBoost(0.20, 0.05);
+        expect(boost).toBeGreaterThan(1.0);
+        expect(boost).toBeLessThanOrEqual(1.5);
+    });
+
+    it('dampens signal for stable funding', () => {
+        // Funding barely changed: 5% to 5.5%
+        const boost = FundingVelocityBoost(0.055, 0.05);
+        expect(boost).toBe(0.8);
+    });
+
+    it('returns 1.0 for normal velocity', () => {
+        // Moderate change: 5% to 10%
+        const boost = FundingVelocityBoost(0.10, 0.05);
+        expect(boost).toBe(1.0);
+    });
+
+    it('returns 1.0 when previous funding is zero', () => {
+        const boost = FundingVelocityBoost(0.15, 0);
+        expect(boost).toBe(1.0);
+    });
+
+    it('caps boost at 1.5', () => {
+        // Extreme jump
+        const boost = FundingVelocityBoost(0.50, 0.01);
+        expect(boost).toBeLessThanOrEqual(1.5);
     });
 });

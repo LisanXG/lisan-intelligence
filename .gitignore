@@ -46,5 +46,3 @@ next-env.d.ts
 # development planning docs
 MASTER_PLAN.md
 SIGNAL_ENGINE_PLAN.md
-
-.vercel
