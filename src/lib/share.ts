@@ -24,13 +24,15 @@ export function downloadPng(dataUrl: string, filename: string): void {
 
 export function openTwitterIntent(signal: SignalOutput): void {
     const emoji = signal.direction === 'LONG' ? '🟢' : signal.direction === 'SHORT' ? '🔴' : '⚪';
-    const text = `${emoji} $${signal.coin} ${signal.direction} | Score: ${signal.score}
+    const formatPrice = (p: number) => p >= 1000 ? `$${p.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : p >= 1 ? `$${p.toFixed(2)}` : `$${p.toFixed(4)}`;
+    const text = `${emoji} $${signal.coin} ${signal.direction} | Score: ${signal.score}/100
 
-Entry: $${signal.entryPrice.toFixed(4)}
-TP: $${signal.takeProfit.toFixed(4)}
-SL: $${signal.stopLoss.toFixed(4)}
+Entry: ${formatPrice(signal.entryPrice)}
+TP: ${formatPrice(signal.takeProfit)}
+SL: ${formatPrice(signal.stopLoss)}
+R:R: ${signal.riskRewardRatio.toFixed(1)}:1
 
-Powered by @LisanTheXG 🧠`;
+🧠 lisanintel.com`;
 
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank', 'width=550,height=420');
