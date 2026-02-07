@@ -351,10 +351,12 @@ export function generateSignal(
         : 1.0; // #8 FIX: All-neutral clusters should not penalize — default to 1.0
     const agreementFactor = Math.max(0.3, agreementRatio); // Floor at 0.3 to avoid zeroing out
 
-    // Total confidence score (0-100), adjusted by cluster agreement
+    // Total confidence score (0-100)
+    // Agreement factor is tracked for visibility but NOT used as a score multiplier —
+    // in mixed markets, it would crush scores to ~15 making everything HOLD.
     const totalMax = momentum.max + trend.max + volume.max + sentiment.max + positioning.max;
     const rawScore = momentum.score + trend.score + volume.score + sentiment.score + positioning.score;
-    const score = Math.round((rawScore / totalMax) * 100 * agreementFactor);
+    const score = Math.round((rawScore / totalMax) * 100);
 
     // Determine direction based on consensus
     let direction: SignalDirection = 'HOLD';
@@ -363,8 +365,7 @@ export function generateSignal(
     const regimeAdj = getRegimeAdjustments(regime);
 
     // Need significant bias and minimum score to trigger signal
-    // v4.1: Base 15% threshold, modified by regime's scoreThresholdMultiplier
-    const directionThreshold = totalMax * 0.15;
+    const directionThreshold = totalMax * 0.10;
     const scoreThreshold = Math.round(50 * regimeAdj.scoreThresholdMultiplier); // Regime adjusts strictness
 
     // Apply regime direction bias to total direction
