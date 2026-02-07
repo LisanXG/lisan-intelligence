@@ -8,6 +8,7 @@ import {
 } from '@/lib/engine';
 import { CURATED_ASSETS, COIN_METADATA } from '@/lib/constants/assets';
 import { detectMarketRegime, MarketRegime } from '@/lib/engine/regime';
+import { getMarketSnapshots } from '@/lib/supabaseServer';
 
 // Hyperliquid API
 const HYPERLIQUID_API = 'https://api.hyperliquid.xyz/info';
@@ -234,6 +235,11 @@ export async function GET() {
 
         const coinData = await Promise.all(ohlcvPromises);
 
+        // Fetch market snapshots from Supabase for HL comparison data
+        // This gives us the same prevOI, prevFunding, avgVolume the cron route uses
+        const allSymbols = coinData.map(c => c.symbol);
+        const prevSnapshots = await getMarketSnapshots(allSymbols);
+
         // Detect market regime using BTC data (same approach as cron/generate)
         const btcCoin = coinData.find(c => c.symbol === 'BTC');
         let regime: MarketRegime = 'UNKNOWN';
@@ -247,11 +253,29 @@ export async function GET() {
                         return ((last - prev) / prev) * 100;
                     });
 
+                // Compute real avgFunding and avgOIChange from HL + snapshots
+                let totalFunding = 0;
+                let fundingCount = 0;
+                let totalOIChange = 0;
+                let oiChangeCount = 0;
+                for (const coin of coinData) {
+                    const hlData = hyperliquidData.get(coin.symbol.toUpperCase());
+                    const prevSnap = prevSnapshots.get(coin.symbol.toUpperCase());
+                    if (hlData) {
+                        totalFunding += hlData.annualizedFunding;
+                        fundingCount++;
+                        if (prevSnap && prevSnap.open_interest > 0) {
+                            totalOIChange += ((hlData.openInterest - prevSnap.open_interest) / prevSnap.open_interest) * 100;
+                            oiChangeCount++;
+                        }
+                    }
+                }
+
                 const regimeResult = detectMarketRegime({
                     btcData: btcCoin.data,
                     altcoinChanges,
-                    avgFunding: 0,   // Snapshot data not available in display route
-                    avgOIChange: 0,
+                    avgFunding: fundingCount > 0 ? totalFunding / fundingCount : 0,
+                    avgOIChange: oiChangeCount > 0 ? totalOIChange / oiChangeCount : 0,
                 });
                 regime = regimeResult.regime;
             } catch {
@@ -271,18 +295,27 @@ export async function GET() {
             try {
                 // Get Hyperliquid data for this coin
                 const hlData = hyperliquidData.get(coin.symbol.toUpperCase());
+                const prevSnapshot = prevSnapshots.get(coin.symbol.toUpperCase());
 
-                // Build HyperliquidContext for the scoring engine
+                // Build HyperliquidContext — same shape as cron/generate
                 let hlContext: HyperliquidContext | null = null;
                 if (hlData) {
+                    // Compute price change from OHLCV
+                    const priceChange = coin.data.length >= 2
+                        ? ((coin.data[coin.data.length - 1].close - coin.data[coin.data.length - 2].close) /
+                            coin.data[coin.data.length - 2].close) * 100
+                        : 0;
+
                     hlContext = {
                         fundingRate: hlData.fundingRate,
                         annualizedFunding: hlData.annualizedFunding,
                         openInterest: hlData.openInterest,
                         premium: hlData.premium,
                         volume24h: hlData.volume24h,
-                        // Note: prevOpenInterest, avgVolume, prevFunding require stored snapshots
-                        // — available in cron/generate but not here. The engine handles missing optionals gracefully.
+                        priceChange,
+                        prevOpenInterest: prevSnapshot?.open_interest ?? undefined,
+                        avgVolume: prevSnapshot?.volume_7d_avg || hlData.volume24h,
+                        prevFunding: prevSnapshot?.funding_rate ?? undefined,
                     };
                 }
 
