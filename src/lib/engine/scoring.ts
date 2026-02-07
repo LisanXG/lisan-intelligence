@@ -369,7 +369,7 @@ export function generateSignal(
     // The PineScript uses 35 on an 85-pt scale; this is proportionally similar.
     // Regime multiplier adjusts dynamically:
     // (e.g., BULL_TREND: 23, HIGH_VOL_CHOP: 33, UNKNOWN: 25)
-    const directionThreshold = totalMax * 0.10;
+    const directionThreshold = totalMax * 0.05;
     const scoreThreshold = Math.round(25 * regimeAdj.scoreThresholdMultiplier);
 
     // Apply regime direction bias to total direction

@@ -187,28 +187,29 @@ export default function SignalCard({ signal, sparklineData, onWatchlistChange }:
             {/* Row 3: Chart */}
             {renderSparkline()}
 
-            {/* Row 4: Stop/Target/R:R */}
+            {/* Row 4: Stop/Target/R:R — hidden for HOLD (no risk levels exist) */}
             <div className="flex justify-between text-base py-3 border-t border-[var(--border-secondary)]">
                 <div>
                     <span className="text-[#9ca3af]">SL </span>
-                    <span className="font-mono font-semibold text-[#ef4444]">{formatPrice(stopLoss)}</span>
+                    <span className="font-mono font-semibold text-[#ef4444]">{direction === 'HOLD' ? '—' : formatPrice(stopLoss)}</span>
                 </div>
                 <div>
                     <span className="text-[#9ca3af]">TP </span>
-                    <span className="font-mono font-semibold text-[#10b981]">{formatPrice(takeProfit)}</span>
+                    <span className="font-mono font-semibold text-[#10b981]">{direction === 'HOLD' ? '—' : formatPrice(takeProfit)}</span>
                 </div>
                 <div>
                     <span className="text-[#9ca3af]">R:R </span>
-                    <span className="font-mono font-bold text-[#06b6d4]">1:{riskRewardRatio.toFixed(1)}</span>
+                    <span className="font-mono font-bold text-[#06b6d4]">{direction === 'HOLD' ? '—' : `1:${riskRewardRatio.toFixed(1)}`}</span>
                 </div>
             </div>
 
-            {/* Row 5: Score breakdown */}
+            {/* Row 5: Score breakdown — all 5 categories */}
             <div className="flex justify-between text-base pt-3 border-t border-[var(--border-secondary)] text-[#9ca3af]">
                 <span>Mom: <strong className="text-[var(--text-primary)]">{Math.round(breakdown.momentum.score)}</strong></span>
                 <span>Trend: <strong className="text-[var(--text-primary)]">{Math.round(breakdown.trend.score)}</strong></span>
                 <span>Vol: <strong className="text-[var(--text-primary)]">{Math.round(breakdown.volume.score)}</strong></span>
                 <span>Sent: <strong className="text-[var(--text-primary)]">{Math.round(breakdown.sentiment.score)}</strong></span>
+                <span>Pos: <strong className="text-[var(--text-primary)]">{Math.round(breakdown.positioning.score)}</strong></span>
             </div>
 
             {/* Row 6: Score bucket context (only if enough historical data) */}

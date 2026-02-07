@@ -197,13 +197,13 @@ export default function QuantView({ signals }: QuantViewProps) {
                                     {formatPrice(signal.entryPrice)}
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono text-xs text-[var(--accent-red)]">
-                                    {formatPrice(signal.stopLoss)}
+                                    {signal.direction === 'HOLD' ? '—' : formatPrice(signal.stopLoss)}
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono text-xs text-[var(--accent-green)]">
-                                    {formatPrice(signal.takeProfit)}
+                                    {signal.direction === 'HOLD' ? '—' : formatPrice(signal.takeProfit)}
                                 </td>
                                 <td className="py-3 px-4 text-center font-mono text-xs text-[var(--accent-cyan)]">
-                                    {signal.riskRewardRatio.toFixed(1)}:1
+                                    {signal.direction === 'HOLD' ? '—' : `${signal.riskRewardRatio.toFixed(1)}:1`}
                                 </td>
                                 <td className="py-3 px-4 text-right text-xs text-[var(--text-muted)]">
                                     {new Date(signal.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
