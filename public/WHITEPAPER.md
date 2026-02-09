@@ -89,7 +89,7 @@ So I curated a list. These are assets with deep liquidity, significant trading v
 | Asset | Asset | Asset | Asset | Asset |
 |-------|-------|-------|-------|-------|
 | BTC | ETH | SOL | AVAX | LINK |
-| DOGE | XRP | ADA | DOT | MATIC |
+| TON | XRP | ADA | DOT | POL |
 | UNI | ATOM | LTC | NEAR | ARB |
 | OP | APT | SUI | HYPE | INJ |
 
@@ -210,27 +210,27 @@ points = weight × strength
 if (signal === 'bullish') totalBullish += points
 if (signal === 'bearish') totalBearish += points
 
-// v4.1: Cluster agreement penalizes contradictory signals
-agreement = agreementRatio(bullishCount, bearishCount)
-normalizedScore = (totalScore / maxPossible) × 100 × agreement
+// v4.1: Cluster agreement tracked for visibility (not a score multiplier)
+agreement = agreementRatio(bullishCount, bearishCount)  // 0.3–1.0
+normalizedScore = (totalScore / maxPossible) × 100
 
 // v4.1: Classification (threshold adapts to market regime):
-scoreThreshold = 50 × regimeMultiplier
-// e.g. 45 in bull trend, 65 in choppy markets
+scoreThreshold = 25 × regimeMultiplier
+// e.g. 23 in bull trend, 33 in choppy markets
 
-if (directionalBias > totalScore × 0.15 AND normalizedScore >= scoreThreshold)
+if (directionalBias > maxPossible × 0.05 AND normalizedScore >= scoreThreshold)
     direction = LONG
-else if (directionalBias < -totalScore × 0.15 AND normalizedScore >= scoreThreshold)
+else if (directionalBias < -maxPossible × 0.05 AND normalizedScore >= scoreThreshold)
     direction = SHORT
 else
     direction = HOLD
 ```
 
-**Why 15% directional bias threshold?**
-v4.1 raised this from 10% to 15%. Because 55% bullish vs 45% bearish isn't conviction — it's noise. We require a clear directional edge before emitting a LONG or SHORT signal. If the indicators are split, that's a HOLD.
+**Why 5% directional bias threshold?**
+The engine requires at least 5% net directional bias (bullish minus bearish points as a fraction of the total possible) before emitting a LONG or SHORT signal. If indicators are evenly split, that's a HOLD — no edge, no trade.
 
-**Why ~50 minimum score?**
-The base threshold is 50. In v4.1, market regime detection adjusts this automatically: in choppy markets the threshold rises to ~65 to filter noise, while in clear trends it drops to ~45. This lets the engine be more selective when conditions are uncertain and more responsive when conditions are clear.
+**Why 25 minimum score?**
+The base threshold is 25, meaning a reasonable portion of indicators must show alignment. In v4.1, market regime detection adjusts this automatically: in choppy markets (HIGH_VOL_CHOP) it rises to ~33 to filter noise, while in clear trends (BULL_TREND / BEAR_TREND) it drops to ~23 to capture higher-probability setups earlier. Quality over quantity, adapted to conditions.
 
 ---
 
@@ -242,13 +242,15 @@ Why ATR? Because volatility changes. A 2% stop loss on BTC during a calm week mi
 
 ### LONG
 - **Entry** = Current market price
-- **Stop Loss** = Entry − (1.5 × ATR)
-- **Take Profit** = Entry + (3.0 × ATR)
+- **Stop Loss** = Entry − (1.5 × ATR), clamped to nearest support
+- **Take Profit** = Entry + (3.0 × ATR), clamped to nearest resistance
 
 ### SHORT
 - **Entry** = Current market price
-- **Stop Loss** = Entry + (1.5 × ATR)
-- **Take Profit** = Entry − (3.0 × ATR)
+- **Stop Loss** = Entry + (1.5 × ATR), clamped to nearest resistance
+- **Take Profit** = Entry − (3.0 × ATR), clamped to nearest support
+
+ATR provides the baseline distances, but the engine also identifies nearby support and resistance levels from recent price action. Final SL/TP are clamped to these structural levels when they fall within the ATR range — this avoids placing stops/targets at arbitrary levels that ignore market structure. A minimum 2% distance from entry is enforced to prevent unrealistically tight targets.
 
 ### Risk:Reward = 1:2
 
@@ -313,13 +315,15 @@ Penalized weights don't stay penalized forever. After 20 trades where an indicat
 
 v4.1 introduced market regime detection — the engine classifies the current market environment before generating signals:
 
-- **BULL_TREND** — BTC trending up, altcoins following, normal OI growth → Lower score threshold (~45), slight long bias
-- **BEAR_TREND** — BTC trending down, widespread alt decline → Lower threshold (~45), slight short bias
-- **HIGH_VOL_CHOP** — High volatility, no clear direction, extreme funding → Stricter threshold (~65), no bias
-- **ACCUMULATION** — Flat price action, OI building, compressed volatility → Normal threshold, no bias
+- **BULL_TREND** — BTC trending up, high ADX, positive RSI momentum → Lower score threshold (~23), slight long bias, trust trend indicators
+- **BEAR_TREND** — BTC trending down, high ADX, negative momentum → Lower threshold (~23), slight short bias
+- **HIGH_VOL_CHOP** — High volatility, no clear direction, low ADX → Stricter threshold (~33), fade crowded positioning
+- **RECOVERY_PUMP** — Sharp reversal after dump, decreasing OI → Momentum plays favored, strong long bias
+- **DISTRIBUTION** — Rising prices with declining OI and divergence → Caution at tops, slight short bias
+- **ACCUMULATION** — Falling prices with accumulation signs, extreme negative funding → Slight long bias
 - **UNKNOWN** — Insufficient data or mixed signals → Default thresholds, no adjustments
 
-Regime classification uses BTC OHLCV data, real altcoin price changes, average funding rates, and average OI changes from stored market snapshots.
+Regime classification uses BTC OHLCV data (EMA position, ADX strength, RSI momentum), real altcoin price changes, average funding rates, and average OI changes from stored market snapshots.
 
 ---
 
@@ -329,8 +333,8 @@ Transparency matters. Here's exactly where the engine gets its data:
 
 | Data Type | Source | Cache TTL |
 |-----------|--------|-----------|
-| OHLCV Price Data | Binance Public API (no auth required) | 5 minutes |
-| HYPE Token Data | Hyperliquid Candle API | 5 minutes |
+| OHLCV Price Data | Hyperliquid Candle API (primary), Binance (fallback) | 5 minutes |
+| Live Entry Prices | Hyperliquid Mark Prices (metaAndAssetCtxs) | Real-time |
 | Fear & Greed Index | Alternative.me (with Supabase cache fallback) | 1 hour |
 | Funding Rates | Hyperliquid Meta API | 30 seconds |
 | Open Interest | Hyperliquid Meta API | 30 seconds |

@@ -37,9 +37,30 @@ function getRateLimitKey(ip: string, path: string): string {
     return `${ip}:${path}`;
 }
 
+// F5 FIX: Counter for periodic cleanup of expired entries
+let requestCounter = 0;
+const CLEANUP_INTERVAL = 100; // Prune every 100th request
+const MAX_ENTRIES = 10000;    // Hard cap to prevent runaway growth
+
+function cleanupExpiredEntries() {
+    const now = Date.now();
+    for (const [key, entry] of requestCounts.entries()) {
+        if (now > entry.resetTime) {
+            requestCounts.delete(key);
+        }
+    }
+}
+
 function isRateLimited(ip: string, path: string, config: RateLimitConfig): boolean {
     const key = getRateLimitKey(ip, path);
     const now = Date.now();
+
+    // Periodic cleanup: prune expired entries every N requests or if map is too large
+    requestCounter++;
+    if (requestCounter >= CLEANUP_INTERVAL || requestCounts.size > MAX_ENTRIES) {
+        cleanupExpiredEntries();
+        requestCounter = 0;
+    }
 
     const current = requestCounts.get(key);
 

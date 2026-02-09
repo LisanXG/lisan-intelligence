@@ -8,7 +8,6 @@ import {
     getUserSignals,
     getTrackingStats,
     DbSignal,
-    getGlobalWeights,
     getLearningHistory as getLearningHistoryFromDb,
     DbLearningCycle
 } from '@/lib/supabase';
@@ -54,16 +53,19 @@ export default function LearningPage() {
         if (!user) return;
 
         try {
-            const [userSignals, userStats, userWeights, learningHistory] = await Promise.all([
+            // Fetch weights via API (uses server-side Supabase, bypasses RLS)
+            const weightsRes = await fetch('/api/weights');
+            const weightsData = weightsRes.ok ? await weightsRes.json() : null;
+
+            const [userSignals, userStats, learningHistory] = await Promise.all([
                 getUserSignals(),
                 getTrackingStats(),
-                getGlobalWeights(),
                 getLearningHistoryFromDb(user.id)
             ]);
             setSignals(userSignals);
             setStats(userStats);
-            if (userWeights) {
-                setWeights({ ...DEFAULT_WEIGHTS, ...userWeights } as IndicatorWeights);
+            if (weightsData?.weights) {
+                setWeights({ ...DEFAULT_WEIGHTS, ...weightsData.weights } as IndicatorWeights);
             }
             // Transform DB learning cycles to display format
             setHistory(learningHistory.map((cycle: DbLearningCycle) => ({

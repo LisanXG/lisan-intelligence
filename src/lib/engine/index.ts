@@ -36,6 +36,7 @@ export {
 // Scoring Engine
 export {
     DEFAULT_WEIGHTS,
+    normalizeWeights,
     generateSignal,
     generateSignals,
     filterSignals,

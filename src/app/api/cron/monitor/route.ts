@@ -170,7 +170,7 @@ async function checkDualTimeframeMomentum(
 async function checkSignalOutcome(
     signal: DbSignal,
     currentPrice: number
-): Promise<{ hit: boolean; outcome?: 'WON' | 'LOST'; exitReason?: 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT' | 'MOMENTUM_EXIT'; profitPct?: number }> {
+): Promise<{ hit: boolean; outcome?: 'WON' | 'LOST'; exitReason?: 'STOP_LOSS' | 'TAKE_PROFIT' | 'MOMENTUM_EXIT'; profitPct?: number }> {
     const { direction, entry_price, stop_loss, take_profit, coin, created_at } = signal;
     const WIN_THRESHOLD_PCT = 3;
 
@@ -198,7 +198,7 @@ async function checkSignalOutcome(
     }
 
     if (direction === 'LONG') {
-        const profitPct = ((currentPrice - entry_price) / entry_price) * 100;
+        // F3 FIX: Removed shadowed `const profitPct` — reuse outer calculation from L180
 
         // Hit full TP - take it (but validate profit is actually positive)
         if (currentPrice >= take_profit) {
@@ -226,7 +226,7 @@ async function checkSignalOutcome(
             return { hit: true, outcome: 'LOST', exitReason: 'STOP_LOSS', profitPct };
         }
     } else if (direction === 'SHORT') {
-        const profitPct = ((entry_price - currentPrice) / entry_price) * 100;
+        // F3 FIX: Removed shadowed `const profitPct` — reuse outer calculation from L180
 
         // Hit full TP - take it (but validate profit is actually positive)
         if (currentPrice <= take_profit) {

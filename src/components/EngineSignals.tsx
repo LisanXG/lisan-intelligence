@@ -56,7 +56,6 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
     const [lastUpdated, setLastUpdated] = useState<string>('');
     const [filter, setFilter] = useState<'ALL' | 'LONG' | 'SHORT' | 'HOLD'>('ALL');
     const [viewMode, setViewMode] = useState<'signals' | 'quant'>('signals');
-    const [openSignals, setOpenSignals] = useState<DbSignal[]>([]);
 
 
     // Track signals to Supabase
@@ -72,7 +71,6 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
         try {
             // Get current open signals from Supabase
             const currentOpenSignals = await getOpenSignals();
-            setOpenSignals(currentOpenSignals);
 
             // Create a set of existing coin+direction combos that are PENDING
             const existingPendingKeys = new Set(
@@ -111,9 +109,7 @@ export default function EngineSignals({ externalFilter, hideFilterTabs = false }
                 }
             }
 
-            // Refresh open signals
-            const updatedOpenSignals = await getOpenSignals();
-            setOpenSignals(updatedOpenSignals);
+
 
         } catch (err) {
             console.error('[Signal] Error tracking signals:', err);

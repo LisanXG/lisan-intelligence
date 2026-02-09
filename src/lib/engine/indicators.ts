@@ -163,11 +163,36 @@ export function StochasticRSI(
         return { value: 50, signal: 'neutral', strength: 0 };
     }
 
-    // Calculate RSI series
+    // F12 FIX: Compute RSI series incrementally in O(n) using Wilder smoothing,
+    // instead of calling RSI(slice) for each position which was O(n²).
     const rsiValues: number[] = [];
-    for (let i = rsiPeriod; i <= closes.length; i++) {
-        const slice = closes.slice(0, i);
-        rsiValues.push(RSI(slice, rsiPeriod).value);
+
+    // Step 1: Seed with initial average gain/loss over first `rsiPeriod` changes
+    let avgGain = 0;
+    let avgLoss = 0;
+    for (let i = 1; i <= rsiPeriod; i++) {
+        const change = closes[i] - closes[i - 1];
+        if (change > 0) avgGain += change;
+        else avgLoss += Math.abs(change);
+    }
+    avgGain /= rsiPeriod;
+    avgLoss /= rsiPeriod;
+
+    // First RSI value
+    const rs0 = avgLoss === 0 ? 100 : avgGain / avgLoss;
+    rsiValues.push(100 - (100 / (1 + rs0)));
+
+    // Step 2: Incrementally compute subsequent RSI values
+    for (let i = rsiPeriod + 1; i < closes.length; i++) {
+        const change = closes[i] - closes[i - 1];
+        const gain = change > 0 ? change : 0;
+        const loss = change < 0 ? Math.abs(change) : 0;
+
+        avgGain = (avgGain * (rsiPeriod - 1) + gain) / rsiPeriod;
+        avgLoss = (avgLoss * (rsiPeriod - 1) + loss) / rsiPeriod;
+
+        const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+        rsiValues.push(100 - (100 / (1 + rs)));
     }
 
     if (rsiValues.length < stochPeriod) {

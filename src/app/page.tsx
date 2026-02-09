@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Header from '@/components/Header';
 import MarketOverview from '@/components/MarketOverview';
 import FearGreedWidget from '@/components/FearGreedWidget';
+import MarketRegimeBadge from '@/components/MarketRegimeBadge';
 import QuickStats from '@/components/QuickStats';
 import EngineSignals from '@/components/EngineSignals';
 import Link from 'next/link';
@@ -25,6 +26,7 @@ export default function Dashboard() {
           </div>
           <div className="lg:col-span-1 space-y-8">
             <FearGreedWidget />
+            <MarketRegimeBadge />
             <QuickStats />
           </div>
         </div>

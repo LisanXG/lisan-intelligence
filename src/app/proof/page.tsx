@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Header from '@/components/Header';
 
 // ============================================================================
 // TYPES (from API response)
@@ -73,7 +73,6 @@ interface ExitBreakdown {
     takeProfit: number;
     stopLoss: number;
     momentumExit: number;
-    target3Percent: number;
 }
 
 interface BestWorstTrade {
@@ -150,224 +149,217 @@ export default function ProofPage() {
     }
 
     return (
-        <main className="min-h-screen p-6 md:p-8">
-            <div className="max-w-6xl mx-auto space-y-8">
+        <>
+            <Header />
+            <main className="min-h-screen pt-28 pb-20 px-6 lg:px-12">
+                <div className="max-w-6xl mx-auto space-y-8">
 
-                {/* Header */}
-                <header className="card p-6 space-y-4">
-                    <Link
-                        href="/"
-                        className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-                    >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M19 12H5M12 19l-7-7 7-7" />
-                        </svg>
-                        Back to Dashboard
-                    </Link>
-
-                    <div>
-                        <h1 className="text-3xl md:text-4xl font-semibold mb-2 text-[var(--text-primary)]">
-                            Does This Actually Work?
-                        </h1>
-                        <p className="text-[var(--text-secondary)] max-w-2xl">
-                            Real performance data. No cherry-picking. Here&apos;s every signal we&apos;ve generated
-                            and how it performed. Judge for yourself.
-                        </p>
-                    </div>
-                </header>
-
-                {/* Early Data Warning */}
-                {summary?.isEarlyData && (
-                    <div className="card p-4 border-l-4 border-l-[var(--accent-orange)] bg-[rgba(245,158,11,0.08)]">
-                        <div className="flex items-start gap-3">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-orange)" strokeWidth="2" className="mt-0.5 flex-shrink-0">
-                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                                <line x1="12" y1="9" x2="12" y2="13" />
-                                <line x1="12" y1="17" x2="12.01" y2="17" />
-                            </svg>
-                            <div>
-                                <h3 className="font-semibold text-[var(--accent-orange)] mb-1">Early Noise Alert</h3>
-                                <p className="text-sm text-[var(--text-secondary)]">
-                                    We have {summary.completedSignals} completed signals. Statistical significance requires
-                                    at least {summary.earlyDataThreshold}. Take these numbers with appropriate skepticism.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Summary Stats */}
-                <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="card p-5 text-center">
-                        <p className={`text-3xl font-bold ${(summary?.overallWinRate || 0) >= 55 ? 'text-[var(--accent-green)]' :
-                            (summary?.overallWinRate || 0) >= 45 ? 'text-[var(--accent-orange)]' :
-                                'text-[var(--accent-red)]'
-                            }`}>
-                            {summary?.overallWinRate || 0}%
-                        </p>
-                        <p className="text-sm text-[var(--text-muted)] mt-1">Win Rate</p>
-                        <p className="text-xs text-[var(--text-muted)]">{summary?.wins || 0} of {summary?.completedSignals || 0}</p>
-                    </div>
-                    <div className="card p-5 text-center">
-                        <p className="text-3xl font-bold text-[var(--accent-green)]">
-                            +{summary?.avgWinPct || 0}%
-                        </p>
-                        <p className="text-sm text-[var(--text-muted)] mt-1">Avg Win</p>
-                        <p className="text-xs text-[var(--text-muted)]">per trade</p>
-                    </div>
-                    <div className="card p-5 text-center">
-                        <p className="text-3xl font-bold text-[var(--accent-red)]">
-                            -{summary?.avgLossPct || 0}%
-                        </p>
-                        <p className="text-sm text-[var(--text-muted)] mt-1">Avg Loss</p>
-                        <p className="text-xs text-[var(--text-muted)]">per trade</p>
-                    </div>
-                    <div className="card p-5 text-center">
-                        <p className={`text-3xl font-bold ${(summary?.totalPct || 0) > 0 ? 'text-[var(--accent-green)]' :
-                            (summary?.totalPct || 0) < 0 ? 'text-[var(--accent-red)]' :
-                                'text-[var(--text-primary)]'
-                            }`}>
-                            {(summary?.totalPct || 0) >= 0 ? '+' : ''}{summary?.totalPct || 0}%
-                        </p>
-                        <p className="text-sm text-[var(--text-muted)] mt-1">Total Return</p>
-                        <p className="text-xs text-[var(--text-muted)]">sum of trades</p>
-                    </div>
-                </section>
-
-                {/* Score Distribution Chart */}
-                <section className="card p-6">
-                    <h2 className="text-xl font-semibold mb-4">Score Distribution</h2>
-                    <p className="text-sm text-[var(--text-secondary)] mb-6">
-                        Win rates grouped by signal score. Higher scores should correlate with better outcomes.
-                    </p>
-
-                    <div className="space-y-4">
-                        {bucketStats.map(bucket => (
-                            <ScoreBucketRow key={bucket.range} bucket={bucket} />
-                        ))}
-                    </div>
-                </section>
-
-                {/* Cumulative Performance Chart */}
-                <section className="card p-6 overflow-hidden">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+                    {/* Header */}
+                    <header className="card p-6 space-y-4">
                         <div>
-                            <h2 className="text-xl font-semibold">Cumulative Performance</h2>
-                            <p className="text-sm text-[var(--text-secondary)] mt-1">
-                                Sum of all trade returns. Assumes equal position sizes per trade.
+                            <h1 className="text-3xl md:text-4xl font-semibold mb-2 text-[var(--text-primary)]">
+                                Does This Actually Work?
+                            </h1>
+                            <p className="text-[var(--text-secondary)] max-w-2xl">
+                                Real performance data. No cherry-picking. Here&apos;s every signal we&apos;ve generated
+                                and how it performed. Judge for yourself.
                             </p>
                         </div>
-                        {cumulativeReturns.length > 0 && (
-                            <div className={`text-xl md:text-2xl font-bold px-4 py-2 rounded-lg w-fit ${(summary?.totalPct || 0) >= 0
-                                ? 'bg-[rgba(16,185,129,0.15)] text-[var(--accent-green)]'
-                                : 'bg-[rgba(239,68,68,0.15)] text-[var(--accent-red)]'}`}>
+                    </header>
+
+                    {/* Early Data Warning */}
+                    {summary?.isEarlyData && (
+                        <div className="card p-4 border-l-4 border-l-[var(--accent-orange)] bg-[rgba(245,158,11,0.08)]">
+                            <div className="flex items-start gap-3">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent-orange)" strokeWidth="2" className="mt-0.5 flex-shrink-0">
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                    <line x1="12" y1="9" x2="12" y2="13" />
+                                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                                </svg>
+                                <div>
+                                    <h3 className="font-semibold text-[var(--accent-orange)] mb-1">Early Noise Alert</h3>
+                                    <p className="text-sm text-[var(--text-secondary)]">
+                                        We have {summary.completedSignals} completed signals. Statistical significance requires
+                                        at least {summary.earlyDataThreshold}. Take these numbers with appropriate skepticism.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Summary Stats */}
+                    <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="card p-5 text-center">
+                            <p className={`text-3xl font-bold ${(summary?.overallWinRate || 0) >= 55 ? 'text-[var(--accent-green)]' :
+                                (summary?.overallWinRate || 0) >= 45 ? 'text-[var(--accent-orange)]' :
+                                    'text-[var(--accent-red)]'
+                                }`}>
+                                {summary?.overallWinRate || 0}%
+                            </p>
+                            <p className="text-sm text-[var(--text-muted)] mt-1">Win Rate</p>
+                            <p className="text-xs text-[var(--text-muted)]">{summary?.wins || 0} of {summary?.completedSignals || 0}</p>
+                        </div>
+                        <div className="card p-5 text-center">
+                            <p className="text-3xl font-bold text-[var(--accent-green)]">
+                                +{summary?.avgWinPct || 0}%
+                            </p>
+                            <p className="text-sm text-[var(--text-muted)] mt-1">Avg Win</p>
+                            <p className="text-xs text-[var(--text-muted)]">per trade</p>
+                        </div>
+                        <div className="card p-5 text-center">
+                            <p className="text-3xl font-bold text-[var(--accent-red)]">
+                                -{summary?.avgLossPct || 0}%
+                            </p>
+                            <p className="text-sm text-[var(--text-muted)] mt-1">Avg Loss</p>
+                            <p className="text-xs text-[var(--text-muted)]">per trade</p>
+                        </div>
+                        <div className="card p-5 text-center">
+                            <p className={`text-3xl font-bold ${(summary?.totalPct || 0) > 0 ? 'text-[var(--accent-green)]' :
+                                (summary?.totalPct || 0) < 0 ? 'text-[var(--accent-red)]' :
+                                    'text-[var(--text-primary)]'
+                                }`}>
                                 {(summary?.totalPct || 0) >= 0 ? '+' : ''}{summary?.totalPct || 0}%
+                            </p>
+                            <p className="text-sm text-[var(--text-muted)] mt-1">Total Return</p>
+                            <p className="text-xs text-[var(--text-muted)]">sum of trades</p>
+                        </div>
+                    </section>
+
+                    {/* Score Distribution Chart */}
+                    <section className="card p-6">
+                        <h2 className="text-xl font-semibold mb-4">Score Distribution</h2>
+                        <p className="text-sm text-[var(--text-secondary)] mb-6">
+                            Win rates grouped by signal score. Higher scores should correlate with better outcomes.
+                        </p>
+
+                        <div className="space-y-4">
+                            {bucketStats.map(bucket => (
+                                <ScoreBucketRow key={bucket.range} bucket={bucket} />
+                            ))}
+                        </div>
+                    </section>
+
+                    {/* Cumulative Performance Chart */}
+                    <section className="card p-6 overflow-hidden">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+                            <div>
+                                <h2 className="text-xl font-semibold">Cumulative Performance</h2>
+                                <p className="text-sm text-[var(--text-secondary)] mt-1">
+                                    Sum of all trade returns. Assumes equal position sizes per trade.
+                                </p>
+                            </div>
+                            {cumulativeReturns.length > 0 && (
+                                <div className={`text-xl md:text-2xl font-bold px-4 py-2 rounded-lg w-fit ${(summary?.totalPct || 0) >= 0
+                                    ? 'bg-[rgba(16,185,129,0.15)] text-[var(--accent-green)]'
+                                    : 'bg-[rgba(239,68,68,0.15)] text-[var(--accent-red)]'}`}>
+                                    {(summary?.totalPct || 0) >= 0 ? '+' : ''}{summary?.totalPct || 0}%
+                                </div>
+                            )}
+                        </div>
+
+                        {cumulativeReturns.length > 0 ? (
+                            <CumulativeChart returns={cumulativeReturns} learningEvents={learningEvents} />
+                        ) : (
+                            <div className="h-64 flex items-center justify-center text-[var(--text-muted)] bg-[var(--bg-secondary)] rounded-lg">
+                                <div className="text-center">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 opacity-50">
+                                        <path d="M3 3v18h18" />
+                                        <path d="M7 16l4-4 4 4 5-6" />
+                                    </svg>
+                                    <p>No completed signals yet</p>
+                                    <p className="text-sm opacity-60 mt-1">Chart will appear once signals resolve</p>
+                                </div>
                             </div>
                         )}
-                    </div>
+                    </section>
 
-                    {cumulativeReturns.length > 0 ? (
-                        <CumulativeChart returns={cumulativeReturns} learningEvents={learningEvents} />
-                    ) : (
-                        <div className="h-64 flex items-center justify-center text-[var(--text-muted)] bg-[var(--bg-secondary)] rounded-lg">
-                            <div className="text-center">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 opacity-50">
-                                    <path d="M3 3v18h18" />
-                                    <path d="M7 16l4-4 4 4 5-6" />
-                                </svg>
-                                <p>No completed signals yet</p>
-                                <p className="text-sm opacity-60 mt-1">Chart will appear once signals resolve</p>
-                            </div>
-                        </div>
-                    )}
-                </section>
+                    {/* Recent Outcomes Table */}
+                    <section className="card p-6">
+                        <h2 className="text-xl font-semibold mb-4">Recent Outcomes</h2>
+                        <p className="text-sm text-[var(--text-secondary)] mb-6">
+                            Last {recentOutcomes.length} completed signals with verified entry/exit prices.
+                        </p>
 
-                {/* Recent Outcomes Table */}
-                <section className="card p-6">
-                    <h2 className="text-xl font-semibold mb-4">Recent Outcomes</h2>
-                    <p className="text-sm text-[var(--text-secondary)] mb-6">
-                        Last {recentOutcomes.length} completed signals with verified entry/exit prices.
-                    </p>
-
-                    {recentOutcomes.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-[var(--border-primary)]">
-                                        <th className="text-left py-3 px-2 text-[var(--text-muted)] font-medium">Coin</th>
-                                        <th className="text-left py-3 px-2 text-[var(--text-muted)] font-medium">Dir</th>
-                                        <th className="text-center py-3 px-2 text-[var(--text-muted)] font-medium">Score</th>
-                                        <th className="text-right py-3 px-2 text-[var(--text-muted)] font-medium">Entry</th>
-                                        <th className="text-right py-3 px-2 text-[var(--text-muted)] font-medium">Exit</th>
-                                        <th className="text-right py-3 px-2 text-[var(--text-muted)] font-medium">P/L</th>
-                                        <th className="text-center py-3 px-2 text-[var(--text-muted)] font-medium">Result</th>
-                                        <th className="text-left py-3 px-2 text-[var(--text-muted)] font-medium">Reason</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {recentOutcomes.map(outcome => (
-                                        <tr key={outcome.id} className="border-b border-[var(--border-secondary)] hover:bg-[var(--bg-secondary)] transition-colors">
-                                            <td className="py-3 px-2 font-medium">{outcome.coin}</td>
-                                            <td className="py-3 px-2">
-                                                <span className={`text-xs font-semibold px-2 py-0.5 rounded ${outcome.direction === 'LONG' ? 'bg-[rgba(16,185,129,0.15)] text-[var(--accent-green)]' :
-                                                    outcome.direction === 'SHORT' ? 'bg-[rgba(239,68,68,0.15)] text-[var(--accent-red)]' :
-                                                        'bg-[rgba(100,116,139,0.15)] text-[var(--text-muted)]'
-                                                    }`}>
-                                                    {outcome.direction}
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-2 text-center">{outcome.score}</td>
-                                            <td className="py-3 px-2 text-right font-mono text-xs">{formatPrice(outcome.entry_price)}</td>
-                                            <td className="py-3 px-2 text-right font-mono text-xs">{formatPrice(outcome.exit_price)}</td>
-                                            <td className={`py-3 px-2 text-right font-mono text-xs ${(outcome.profit_pct || 0) >= 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'
-                                                }`}>
-                                                {(outcome.profit_pct || 0) >= 0 ? '+' : ''}{outcome.profit_pct?.toFixed(2) || '0'}%
-                                            </td>
-                                            <td className="py-3 px-2 text-center">
-                                                <span className={`text-xs font-semibold px-2 py-0.5 rounded ${outcome.outcome === 'WON' ? 'bg-[rgba(16,185,129,0.15)] text-[var(--accent-green)]' :
-                                                    'bg-[rgba(239,68,68,0.15)] text-[var(--accent-red)]'
-                                                    }`}>
-                                                    {outcome.outcome}
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-2 text-[var(--text-muted)]">{outcome.exit_reason || '-'}</td>
+                        {recentOutcomes.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b border-[var(--border-primary)]">
+                                            <th className="text-left py-3 px-2 text-[var(--text-muted)] font-medium">Coin</th>
+                                            <th className="text-left py-3 px-2 text-[var(--text-muted)] font-medium">Dir</th>
+                                            <th className="text-center py-3 px-2 text-[var(--text-muted)] font-medium">Score</th>
+                                            <th className="text-right py-3 px-2 text-[var(--text-muted)] font-medium">Entry</th>
+                                            <th className="text-right py-3 px-2 text-[var(--text-muted)] font-medium">Exit</th>
+                                            <th className="text-right py-3 px-2 text-[var(--text-muted)] font-medium">P/L</th>
+                                            <th className="text-center py-3 px-2 text-[var(--text-muted)] font-medium">Result</th>
+                                            <th className="text-left py-3 px-2 text-[var(--text-muted)] font-medium">Reason</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    ) : (
-                        <div className="h-32 flex items-center justify-center text-[var(--text-muted)]">
-                            No completed signals yet
-                        </div>
-                    )}
-                </section>
+                                    </thead>
+                                    <tbody>
+                                        {recentOutcomes.map(outcome => (
+                                            <tr key={outcome.id} className="border-b border-[var(--border-secondary)] hover:bg-[var(--bg-secondary)] transition-colors">
+                                                <td className="py-3 px-2 font-medium">{outcome.coin}</td>
+                                                <td className="py-3 px-2">
+                                                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${outcome.direction === 'LONG' ? 'bg-[rgba(16,185,129,0.15)] text-[var(--accent-green)]' :
+                                                        outcome.direction === 'SHORT' ? 'bg-[rgba(239,68,68,0.15)] text-[var(--accent-red)]' :
+                                                            'bg-[rgba(100,116,139,0.15)] text-[var(--text-muted)]'
+                                                        }`}>
+                                                        {outcome.direction}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-2 text-center">{outcome.score}</td>
+                                                <td className="py-3 px-2 text-right font-mono text-xs">{formatPrice(outcome.entry_price)}</td>
+                                                <td className="py-3 px-2 text-right font-mono text-xs">{formatPrice(outcome.exit_price)}</td>
+                                                <td className={`py-3 px-2 text-right font-mono text-xs ${(outcome.profit_pct || 0) >= 0 ? 'text-[var(--accent-green)]' : 'text-[var(--accent-red)]'
+                                                    }`}>
+                                                    {(outcome.profit_pct || 0) >= 0 ? '+' : ''}{outcome.profit_pct?.toFixed(2) || '0'}%
+                                                </td>
+                                                <td className="py-3 px-2 text-center">
+                                                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${outcome.outcome === 'WON' ? 'bg-[rgba(16,185,129,0.15)] text-[var(--accent-green)]' :
+                                                        'bg-[rgba(239,68,68,0.15)] text-[var(--accent-red)]'
+                                                        }`}>
+                                                        {outcome.outcome}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-2 text-[var(--text-muted)]">{outcome.exit_reason || '-'}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="h-32 flex items-center justify-center text-[var(--text-muted)]">
+                                No completed signals yet
+                            </div>
+                        )}
+                    </section>
 
-                {/* Honest Disclaimers */}
-                <section className="card p-6">
-                    <h2 className="text-xl font-semibold mb-4">Disclaimers</h2>
-                    <ul className="space-y-3">
-                        <li className="flex items-start gap-3">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" className="mt-1 flex-shrink-0">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="12" y1="8" x2="12" y2="12" />
-                                <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg>
-                            <span className="text-[var(--text-muted)]">
-                                Past performance does not guarantee future results. This is not financial advice.
-                            </span>
-                        </li>
-                    </ul>
-                </section>
+                    {/* Honest Disclaimers */}
+                    <section className="card p-6">
+                        <h2 className="text-xl font-semibold mb-4">Disclaimers</h2>
+                        <ul className="space-y-3">
+                            <li className="flex items-start gap-3">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" className="mt-1 flex-shrink-0">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="8" x2="12" y2="12" />
+                                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                                <span className="text-[var(--text-muted)]">
+                                    Past performance does not guarantee future results. This is not financial advice.
+                                </span>
+                            </li>
+                        </ul>
+                    </section>
 
-                {/* Footer */}
-                <footer className="text-center text-sm text-[var(--text-muted)] py-8">
-                    <p>
-                        Data refreshes on page load. Last refreshed: {new Date().toLocaleTimeString()}
-                    </p>
-                </footer>
-            </div>
-        </main>
+                    {/* Footer */}
+                    <footer className="text-center text-sm text-[var(--text-muted)] py-8">
+                        <p>
+                            Data refreshes on page load. Last refreshed: {new Date().toLocaleTimeString()}
+                        </p>
+                    </footer>
+                </div>
+            </main>
+        </>
     );
 }
 
@@ -487,21 +479,20 @@ function CumulativeChart({ returns, learningEvents }: { returns: CumulativeRetur
     if (!yTicks.includes(0)) yTicks.push(0);
     yTicks.sort((a, b) => b - a);
 
-    // Find learning event positions on the chart
-    const learningPositions = learningEvents.map(event => {
-        const eventTime = new Date(event.occurredAt).getTime();
-        // Find the trade closest to when learning occurred
-        let closestIdx = 0;
-        let minDiff = Infinity;
-        returns.forEach((r, i) => {
-            const diff = Math.abs(new Date(r.closedAt).getTime() - eventTime);
-            if (diff < minDiff) {
-                minDiff = diff;
-                closestIdx = i;
+    // Compute learning event positions from the trade sequence itself
+    // Place a marker at every 3rd consecutive loss for clean visual alignment
+    const learningPositions: { x: number; streakLength: number }[] = [];
+    let consecutiveLosses = 0;
+    for (let i = 0; i < returns.length; i++) {
+        if (returns[i].outcome === 'LOST') {
+            consecutiveLosses++;
+            if (consecutiveLosses >= 3 && consecutiveLosses % 3 === 0) {
+                learningPositions.push({ x: getX(i), streakLength: consecutiveLosses });
             }
-        });
-        return { x: getX(closestIdx), event };
-    });
+        } else {
+            consecutiveLosses = 0;
+        }
+    }
 
     // Format date for display
     const formatDate = (dateStr: string) => {
@@ -656,7 +647,7 @@ function CumulativeChart({ returns, learningEvents }: { returns: CumulativeRetur
                     <div className="w-2 h-2 rounded-full bg-red-500"></div>
                     <span>Loss</span>
                 </div>
-                {learningEvents.length > 0 && (
+                {learningPositions.length > 0 && (
                     <div className="flex items-center gap-2">
                         <div className="w-0.5 h-4 bg-purple-400"></div>
                         <span>Learning Event</span>

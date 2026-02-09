@@ -583,18 +583,28 @@ export default function DocsPage() {
                                     <h4 className="font-bold text-emerald-700 mb-4 text-lg">LONG</h4>
                                     <ul className="space-y-2 text-slate-600">
                                         <li><strong>Entry</strong> = Current market price</li>
-                                        <li><strong>Stop Loss</strong> = Entry − (1.5 × ATR)</li>
-                                        <li><strong>Take Profit</strong> = Entry + (3.0 × ATR)</li>
+                                        <li><strong>Stop Loss</strong> = Entry − (1.5 × ATR), clamped to nearest support</li>
+                                        <li><strong>Take Profit</strong> = Entry + (3.0 × ATR), clamped to nearest resistance</li>
                                     </ul>
                                 </div>
                                 <div className="p-6 bg-red-50 border border-red-200 rounded-lg">
                                     <h4 className="font-bold text-red-700 mb-4 text-lg">SHORT</h4>
                                     <ul className="space-y-2 text-slate-600">
                                         <li><strong>Entry</strong> = Current market price</li>
-                                        <li><strong>Stop Loss</strong> = Entry + (1.5 × ATR)</li>
-                                        <li><strong>Take Profit</strong> = Entry − (3.0 × ATR)</li>
+                                        <li><strong>Stop Loss</strong> = Entry + (1.5 × ATR), clamped to nearest resistance</li>
+                                        <li><strong>Take Profit</strong> = Entry − (3.0 × ATR), clamped to nearest support</li>
                                     </ul>
                                 </div>
+                            </div>
+
+                            <div className="bg-slate-50 rounded-lg p-4 mb-4">
+                                <p className="font-semibold text-slate-700 mb-2">Support/Resistance Clamping</p>
+                                <p className="text-slate-600">
+                                    ATR provides baseline distances, but the engine also identifies nearby support and resistance
+                                    levels from recent price action. Final SL/TP are clamped to these structural levels when they
+                                    fall within the ATR range — avoiding stops/targets at arbitrary levels that ignore market
+                                    structure. A minimum 2% distance from entry is enforced to prevent unrealistically tight targets.
+                                </p>
                             </div>
 
                             <div className="bg-slate-50 rounded-lg p-4">
@@ -1100,7 +1110,7 @@ export default function DocsPage() {
 
                     {/* Version */}
                     <div className="mt-8 text-center text-slate-400">
-                        <p>Version 4.1.0 — February 2026 — Positioning Cluster, Bidirectional Learning & Dual-TF Exits — LISAN HOLDINGS</p>
+                        <p>Version 4.1.1 — February 2026 — Production Accuracy Audit — LISAN HOLDINGS</p>
                     </div>
                 </div>
             </main>

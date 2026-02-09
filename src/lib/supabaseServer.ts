@@ -161,7 +161,7 @@ export async function getGlobalWeights(): Promise<Record<string, number> | null>
         .from('global_weights')
         .select('weights')
         .eq('id', 1)
-        .single();
+        .maybeSingle();
 
     if (error) {
         logger.error('Error fetching global weights', error);
@@ -173,15 +173,16 @@ export async function getGlobalWeights(): Promise<Record<string, number> | null>
 
 /**
  * Update GLOBAL weights (after learning cycle)
+ * Uses upsert to create the row if it doesn't exist yet.
  */
 export async function updateGlobalWeights(weights: Record<string, number>): Promise<boolean> {
     const { error } = await supabaseServer
         .from('global_weights')
-        .update({
+        .upsert({
+            id: 1,
             weights,
             updated_at: new Date().toISOString()
-        })
-        .eq('id', 1);
+        });
 
     if (error) {
         logger.error('Error updating global weights', error);

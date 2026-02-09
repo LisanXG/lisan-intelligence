@@ -97,7 +97,7 @@ export default function Header() {
                         </div>
                     )}
                     <span className="text-xs text-slate-400 font-mono bg-slate-100/80 px-2 py-1 rounded-lg">
-                        v4.1.0
+                        v4.1.1
                     </span>
                 </div>
             </div>
@@ -138,7 +138,7 @@ export default function Header() {
                                 </button>
                             </>
                         )}
-                        <span className="ml-auto font-mono text-xs bg-slate-100 px-2 py-1 rounded">v4.1.0</span>
+                        <span className="ml-auto font-mono text-xs bg-slate-100 px-2 py-1 rounded">v4.1.1</span>
                     </div>
                 </div>
             )}

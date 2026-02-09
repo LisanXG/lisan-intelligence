@@ -103,7 +103,7 @@ export async function fetchHyperliquidMarketContext(
         return {
             assets,
             avgFunding: fundingCount > 0 ? totalFunding / fundingCount : 0,
-            avgOIChange: 0, // Will be calculated with historical data in Phase 3
+            avgOIChange: 0, // F10: Vestigial — OI change is computed from stored snapshots in generate/route.ts
             timestamp: new Date(),
         };
     } catch (error) {

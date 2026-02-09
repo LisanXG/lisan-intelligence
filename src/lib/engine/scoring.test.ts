@@ -7,6 +7,8 @@
 import { describe, it, expect } from 'vitest';
 import {
     generateSignal,
+    generateSignals,
+    normalizeWeights,
     DEFAULT_WEIGHTS,
 } from './scoring';
 import { OHLCV, analyzeAsset } from './indicators';
@@ -247,5 +249,78 @@ describe('analyzeAsset', () => {
         const data = generateMockOHLCV(100);
         const analysis = analyzeAsset(data);
         expect(analysis.trend.emaAlignment).toHaveProperty('value');
+    });
+});
+
+// ============================================================================
+// normalizeWeights TESTS (F13)
+// ============================================================================
+
+describe('normalizeWeights', () => {
+    it('returns weights unchanged when already summing to 100', () => {
+        const result = normalizeWeights(DEFAULT_WEIGHTS);
+        const total = Object.values(result).reduce((s, w) => s + w, 0);
+        expect(Math.abs(total - 100)).toBeLessThan(0.01);
+    });
+
+    it('scales weights to sum to ~100', () => {
+        const inflated = { ...DEFAULT_WEIGHTS };
+        Object.keys(inflated).forEach((k) => {
+            (inflated as Record<string, number>)[k] *= 2;
+        });
+        const result = normalizeWeights(inflated);
+        const total = Object.values(result).reduce((s, w) => s + w, 0);
+        expect(Math.abs(total - 100)).toBeLessThan(1);
+    });
+
+    it('clamps to minWeight', () => {
+        const extreme = { ...DEFAULT_WEIGHTS };
+        (extreme as Record<string, number>).rsi = 0.001;
+        const result = normalizeWeights(extreme, 1, 20);
+        expect(result.rsi).toBeGreaterThanOrEqual(1);
+    });
+
+    it('clamps to maxWeight', () => {
+        const extreme = { ...DEFAULT_WEIGHTS };
+        (extreme as Record<string, number>).rsi = 50;
+        const result = normalizeWeights(extreme, 1, 20);
+        expect(result.rsi).toBeLessThanOrEqual(20);
+    });
+
+    it('handles zero total gracefully', () => {
+        const zero = { ...DEFAULT_WEIGHTS };
+        Object.keys(zero).forEach((k) => {
+            (zero as Record<string, number>)[k] = 0;
+        });
+        const result = normalizeWeights(zero);
+        expect(result.rsi).toBe(0);
+    });
+});
+
+// ============================================================================
+// generateSignals BATCH TESTS (F2)
+// ============================================================================
+
+describe('generateSignals', () => {
+    it('generates signals for multiple coins', () => {
+        const coinData = [
+            { coin: 'BTC', data: generateMockOHLCV(100) },
+            { coin: 'ETH', data: generateMockOHLCV(100) },
+        ];
+        const signals = generateSignals(coinData);
+        expect(signals).toHaveLength(2);
+        expect(signals[0].coin).toBe('BTC');
+        expect(signals[1].coin).toBe('ETH');
+    });
+
+    it('respects custom timeframe', () => {
+        const coinData = [{ coin: 'SOL', data: generateMockOHLCV(100) }];
+        const signals = generateSignals(coinData, null, DEFAULT_WEIGHTS, null, '1h');
+        expect(signals[0].timeframe).toBe('1h');
+    });
+
+    it('returns empty array for empty input', () => {
+        const signals = generateSignals([]);
+        expect(signals).toHaveLength(0);
     });
 });

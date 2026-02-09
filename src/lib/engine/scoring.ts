@@ -98,7 +98,7 @@ export interface SignalOutput {
 }
 
 // ============================================================================
-// DEFAULT WEIGHTS (100 points total)
+// DEFAULT WEIGHTS (must sum to 100 — enforced by normalizeWeights and tests)
 // ============================================================================
 
 export const DEFAULT_WEIGHTS: IndicatorWeights = {
@@ -131,6 +131,65 @@ export const DEFAULT_WEIGHTS: IndicatorWeights = {
     basisPremium: 3,    // v4.1: Mark-index basis (contrarian)
     hlVolume: 3,        // v4.1: HL volume momentum
 };
+
+/**
+ * Renormalize weights to sum to 100 while preserving ratios.
+ * Without this, weights drift from the 100-point total after repeated learning adjustments.
+ * Uses iterative approach: scale → clamp → redistribute remainder.
+ *
+ * @param weights - Current weights (may not sum to 100)
+ * @param minWeight - Minimum allowed weight (default 1)
+ * @param maxWeight - Maximum allowed weight (default 20)
+ */
+export function normalizeWeights(
+    weights: IndicatorWeights,
+    minWeight: number = 1,
+    maxWeight: number = 20
+): IndicatorWeights {
+    const keys = Object.keys(weights) as (keyof IndicatorWeights)[];
+    const total = keys.reduce((sum, k) => sum + weights[k], 0);
+    if (total === 0 || Math.abs(total - 100) < 0.01) return weights;
+
+    const normalized = { ...weights };
+
+    // Step 1: Scale all weights proportionally
+    const scale = 100 / total;
+    for (const key of keys) {
+        normalized[key] = normalized[key] * scale;
+    }
+
+    // Step 2: Clamp to min/max bounds and track remainder
+    let clampedSum = 0;
+    let unclampedSum = 0;
+    const unclampedKeys: (keyof IndicatorWeights)[] = [];
+
+    for (const key of keys) {
+        if (normalized[key] < minWeight) {
+            normalized[key] = minWeight;
+            clampedSum += minWeight;
+        } else if (normalized[key] > maxWeight) {
+            normalized[key] = maxWeight;
+            clampedSum += maxWeight;
+        } else {
+            unclampedKeys.push(key);
+            unclampedSum += normalized[key];
+        }
+    }
+
+    // Step 3: Redistribute remainder across unclamped weights
+    const target = 100 - clampedSum;
+    if (unclampedKeys.length > 0 && unclampedSum > 0) {
+        const redistributScale = target / unclampedSum;
+        for (const key of unclampedKeys) {
+            normalized[key] = Math.max(
+                minWeight,
+                Math.min(maxWeight, normalized[key] * redistributScale)
+            );
+        }
+    }
+
+    return normalized;
+}
 
 // ============================================================================
 // SCORING FUNCTIONS
@@ -352,17 +411,25 @@ export function generateSignal(
     const agreementFactor = Math.max(0.3, agreementRatio); // Floor at 0.3 to avoid zeroing out
 
     // Total confidence score (0-100)
-    // Agreement factor is tracked for visibility but NOT used as a score multiplier —
-    // in mixed markets, it would crush scores to ~15 making everything HOLD.
+    // DESIGN DECISION: agreementFactor is tracked for learning visibility and stored in the
+    // indicators snapshot, but intentionally NOT used as a score multiplier.
+    // Reason: In mixed markets (common during range-bound BTC), it crushes scores to ~15
+    // making everything HOLD. The directional threshold already handles contradictory signals.
     const totalMax = momentum.max + trend.max + volume.max + sentiment.max + positioning.max;
-    const rawScore = momentum.score + trend.score + volume.score + sentiment.score + positioning.score;
+
+    // F1 FIX: Apply regime weight multipliers to category scores.
+    // This scales category influence based on detected market conditions without
+    // changing the denominator, so regime detection actually affects signal quality.
+    const regimeAdj = getRegimeAdjustments(regime);
+    const rawScore = (momentum.score * regimeAdj.momentumWeightMultiplier)
+        + (trend.score * regimeAdj.trendWeightMultiplier)
+        + volume.score
+        + sentiment.score
+        + (positioning.score * regimeAdj.positioningWeightMultiplier);
     const score = Math.round((rawScore / totalMax) * 100);
 
     // Determine direction based on consensus
     let direction: SignalDirection = 'HOLD';
-
-    // v4.1: Apply regime-based threshold adjustments
-    const regimeAdj = getRegimeAdjustments(regime);
 
     // Need significant bias and minimum score to trigger signal
     // Base threshold 25 — lowered from 40 to generate more actionable signals.
@@ -440,11 +507,15 @@ export function generateSignal(
 export function generateSignals(
     coinData: { coin: string; data: OHLCV[] }[],
     fearGreedIndex: number | null = null,
-    weights: IndicatorWeights = DEFAULT_WEIGHTS
+    weights: IndicatorWeights = DEFAULT_WEIGHTS,
+    hlContextMap: Map<string, HyperliquidContext> | null = null,
+    timeframe: string = '4h',
+    regime: MarketRegime = 'UNKNOWN'
 ): SignalOutput[] {
-    return coinData.map(({ coin, data }) =>
-        generateSignal(data, coin, fearGreedIndex, weights)
-    );
+    return coinData.map(({ coin, data }) => {
+        const hlContext = hlContextMap?.get(coin.toUpperCase()) ?? null;
+        return generateSignal(data, coin, fearGreedIndex, weights, hlContext, timeframe, regime);
+    });
 }
 
 /**

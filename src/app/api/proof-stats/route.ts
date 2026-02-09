@@ -78,7 +78,6 @@ interface ExitBreakdown {
     takeProfit: number;
     stopLoss: number;
     momentumExit: number;
-    target3Percent: number;
 }
 
 interface BestWorstTrade {
@@ -237,7 +236,6 @@ export async function GET() {
             takeProfit: completedSignals.filter(s => s.exit_reason === 'TAKE_PROFIT').length,
             stopLoss: completedSignals.filter(s => s.exit_reason === 'STOP_LOSS').length,
             momentumExit: completedSignals.filter(s => s.exit_reason === 'MOMENTUM_EXIT').length,
-            target3Percent: completedSignals.filter(s => s.exit_reason === 'TARGET_3_PERCENT').length,
         };
 
         // Find best and worst trades

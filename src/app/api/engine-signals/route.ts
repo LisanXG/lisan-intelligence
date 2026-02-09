@@ -212,6 +212,8 @@ export interface EngineSignalResponse {
         };
     })[];
     fearGreed: number | null;
+    regime: MarketRegime;
+    regimeConfidence: number;
     lastUpdated: string;
     weightsVersion: string;
 }
@@ -243,6 +245,7 @@ export async function GET() {
         // Detect market regime using BTC data (same approach as cron/generate)
         const btcCoin = coinData.find(c => c.symbol === 'BTC');
         let regime: MarketRegime = 'UNKNOWN';
+        let regimeConfidence = 0;
         if (btcCoin && btcCoin.data.length >= 50) {
             try {
                 const altcoinChanges = coinData
@@ -278,6 +281,7 @@ export async function GET() {
                     avgOIChange: oiChangeCount > 0 ? totalOIChange / oiChangeCount : 0,
                 });
                 regime = regimeResult.regime;
+                regimeConfidence = regimeResult.confidence ?? 0;
             } catch {
                 // Fall back to UNKNOWN if regime detection fails
             }
@@ -346,6 +350,8 @@ export async function GET() {
         return NextResponse.json({
             signals,
             fearGreed,
+            regime,
+            regimeConfidence,
             lastUpdated: new Date().toISOString(),
             weightsVersion: 'v1',
         } as EngineSignalResponse);
@@ -357,6 +363,8 @@ export async function GET() {
         return NextResponse.json({
             signals: [],
             fearGreed: null,
+            regime: 'UNKNOWN' as MarketRegime,
+            regimeConfidence: 0,
             lastUpdated: new Date().toISOString(),
             weightsVersion: 'v1',
             error: 'Failed to generate signals',

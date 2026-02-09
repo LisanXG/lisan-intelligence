@@ -75,4 +75,4 @@ export interface DbLearningCycle {
 
 export type SignalDirection = 'LONG' | 'SHORT' | 'HOLD';
 export type SignalOutcome = 'PENDING' | 'WON' | 'LOST';
-export type ExitReason = 'STOP_LOSS' | 'TAKE_PROFIT' | 'TARGET_3_PERCENT' | 'MOMENTUM_EXIT' | 'MANUAL';
+export type ExitReason = 'STOP_LOSS' | 'TAKE_PROFIT' | 'MOMENTUM_EXIT' | 'MANUAL';

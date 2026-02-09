@@ -19,7 +19,7 @@ import {
     getDirectionalStats,
     getTradesSinceIndicatorLoss,
 } from '@/lib/supabaseServer';
-import { DEFAULT_WEIGHTS, IndicatorWeights } from '@/lib/engine/scoring';
+import { DEFAULT_WEIGHTS, IndicatorWeights, normalizeWeights } from '@/lib/engine/scoring';
 
 const log = logger.withContext('CronLearn');
 
@@ -59,55 +59,29 @@ const LEARNING_CONFIG = {
 // ============================================================================
 
 /**
- * #9 FIX: Renormalize weights to sum to 100 while preserving ratios.
- * Without this, weights drift from the 100-point total after repeated adjustments.
- * Uses iterative approach: scale → clamp → redistribute remainder.
+ * F4 FIX: Shared indicator-to-weight mapping used by both loss and win analysis.
+ * Extracted to module level to prevent asymmetry if a new indicator is added to one side.
  */
-function normalizeWeights(weights: IndicatorWeights): IndicatorWeights {
-    const keys = Object.keys(weights) as (keyof IndicatorWeights)[];
-    const total = keys.reduce((sum, k) => sum + weights[k], 0);
-    if (total === 0 || Math.abs(total - 100) < 0.01) return weights;
-
-    const normalized = { ...weights };
-
-    // Step 1: Scale all weights proportionally
-    const scale = 100 / total;
-    for (const key of keys) {
-        normalized[key] = normalized[key] * scale;
-    }
-
-    // Step 2: Clamp to min/max bounds and track remainder
-    let clampedSum = 0;
-    let unclampedSum = 0;
-    const unclampedKeys: (keyof IndicatorWeights)[] = [];
-
-    for (const key of keys) {
-        if (normalized[key] < LEARNING_CONFIG.minWeight) {
-            normalized[key] = LEARNING_CONFIG.minWeight;
-            clampedSum += LEARNING_CONFIG.minWeight;
-        } else if (normalized[key] > LEARNING_CONFIG.maxWeight) {
-            normalized[key] = LEARNING_CONFIG.maxWeight;
-            clampedSum += LEARNING_CONFIG.maxWeight;
-        } else {
-            unclampedKeys.push(key);
-            unclampedSum += normalized[key];
-        }
-    }
-
-    // Step 3: Redistribute remainder across unclamped weights
-    const target = 100 - clampedSum;
-    if (unclampedKeys.length > 0 && unclampedSum > 0) {
-        const redistributScale = target / unclampedSum;
-        for (const key of unclampedKeys) {
-            normalized[key] = Math.max(
-                LEARNING_CONFIG.minWeight,
-                Math.min(LEARNING_CONFIG.maxWeight, normalized[key] * redistributScale)
-            );
-        }
-    }
-
-    return normalized;
-}
+const INDICATOR_TO_WEIGHT: Record<string, keyof IndicatorWeights> = {
+    rsi: 'rsi',
+    stochRSI: 'stochRSI',
+    macd: 'macd',
+    williamsR: 'williamsR',
+    cci: 'cci',
+    emaAlignment: 'emaAlignment',
+    ichimoku: 'ichimoku',
+    adx: 'adx',
+    bollinger: 'bollinger',
+    obvTrend: 'obvTrend',
+    volumeRatio: 'volumeRatio',
+    zScore: 'zScore',
+    // v4.1: HL-native indicators (24pts total)
+    fearGreed: 'fearGreed',
+    fundingRate: 'fundingRate',
+    oiChange: 'oiChange',
+    basisPremium: 'basisPremium',
+    hlVolume: 'hlVolume',
+};
 
 /**
  * Get recent losing signals (global)
@@ -136,32 +110,13 @@ function analyzeLosingSignals(
 ): Map<keyof IndicatorWeights, { wrongCount: number; avgConfidence: number }> {
     const indicatorStats = new Map<keyof IndicatorWeights, { wrongCount: number; totalConfidence: number }>();
 
-    const indicatorToWeight: Record<string, keyof IndicatorWeights> = {
-        rsi: 'rsi',
-        stochRSI: 'stochRSI',
-        macd: 'macd',
-        williamsR: 'williamsR',
-        cci: 'cci',
-        emaAlignment: 'emaAlignment',
-        ichimoku: 'ichimoku',
-        adx: 'adx',
-        bollinger: 'bollinger',
-        obvTrend: 'obvTrend',
-        volumeRatio: 'volumeRatio',
-        zScore: 'zScore',
-        // v4.1: Previously missing — these 5 indicators (24pts) were invisible to learning
-        fearGreed: 'fearGreed',
-        fundingRate: 'fundingRate',
-        oiChange: 'oiChange',
-        basisPremium: 'basisPremium',
-        hlVolume: 'hlVolume',
-    };
+    // F4 FIX: Uses shared INDICATOR_TO_WEIGHT instead of local duplicate
 
     for (const signal of losingSignals) {
         const direction = signal.direction;
         const indicators = signal.indicator_snapshot || {};
 
-        for (const [name, weightKey] of Object.entries(indicatorToWeight)) {
+        for (const [name, weightKey] of Object.entries(INDICATOR_TO_WEIGHT)) {
             const value = indicators[name];
             if (value === undefined) continue;
 
@@ -393,32 +348,13 @@ function analyzeWinningSignals(
 ): Map<keyof IndicatorWeights, { correctCount: number; avgConfidence: number }> {
     const indicatorStats = new Map<keyof IndicatorWeights, { correctCount: number; totalConfidence: number }>();
 
-    const indicatorToWeight: Record<string, keyof IndicatorWeights> = {
-        rsi: 'rsi',
-        stochRSI: 'stochRSI',
-        macd: 'macd',
-        williamsR: 'williamsR',
-        cci: 'cci',
-        emaAlignment: 'emaAlignment',
-        ichimoku: 'ichimoku',
-        adx: 'adx',
-        bollinger: 'bollinger',
-        obvTrend: 'obvTrend',
-        volumeRatio: 'volumeRatio',
-        zScore: 'zScore',
-        // v4.1: Previously missing — these 5 indicators (24pts) were invisible to learning
-        fearGreed: 'fearGreed',
-        fundingRate: 'fundingRate',
-        oiChange: 'oiChange',
-        basisPremium: 'basisPremium',
-        hlVolume: 'hlVolume',
-    };
+    // F4 FIX: Uses shared INDICATOR_TO_WEIGHT instead of local duplicate
 
     for (const signal of winningSignals) {
         const direction = signal.direction;
         const indicators = signal.indicator_snapshot || {};
 
-        for (const [name, weightKey] of Object.entries(indicatorToWeight)) {
+        for (const [name, weightKey] of Object.entries(INDICATOR_TO_WEIGHT)) {
             const value = indicators[name];
             if (value === undefined) continue;
 
@@ -495,10 +431,10 @@ function analyzeWinningSignals(
             }
 
             if (wasCorrectlyConfident) {
-                const existing = indicatorStats.get(weightKey) || { correctCount: 0, totalConfidence: 0 };
+                const existing = indicatorStats.get(weightKey as keyof IndicatorWeights) || { correctCount: 0, totalConfidence: 0 };
                 existing.correctCount++;
                 existing.totalConfidence += Math.abs(value);
-                indicatorStats.set(weightKey, existing);
+                indicatorStats.set(weightKey as keyof IndicatorWeights, existing);
             }
         }
     }
