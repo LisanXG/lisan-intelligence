@@ -1,6 +1,6 @@
 # LISAN INTELLIGENCE
 
-> A quantitative crypto signal platform with a 14-indicator scoring engine.  
+> A quantitative crypto signal platform with a 17-indicator scoring engine.  
 > Replace gut feelings with math. Free. No paywall. Just signals.
 
 **🔗 Live:** [lisanintel.com](https://lisanintel.com)
