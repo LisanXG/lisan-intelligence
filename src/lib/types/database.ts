@@ -23,7 +23,7 @@ export interface DbSignal {
     exit_price?: number;
     exit_reason?: ExitReason;
     profit_pct?: number;
-    indicator_snapshot: Record<string, number>;
+    indicator_snapshot: Record<string, number | string | boolean>;
     weights_used: Record<string, number>;
     created_at: string;
     closed_at?: string;

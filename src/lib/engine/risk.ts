@@ -252,6 +252,7 @@ export function calculateRiskLevels(
 /**
  * Validate risk levels meet minimum requirements
  * 
+ * @planned Intended for future Portfolio Management feature (position sizing UI).
  * @param levels - Calculated risk levels
  * @param minRR - Minimum acceptable risk/reward ratio (default 1.5)
  */
@@ -286,6 +287,7 @@ export function validateRiskLevels(
 /**
  * Get position size based on risk
  * 
+ * @planned Intended for future Portfolio Management feature (position sizing UI).
  * @param accountBalance - Total account balance
  * @param riskPercent - Percentage of account to risk per trade
  * @param levels - Calculated risk levels

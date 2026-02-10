@@ -290,7 +290,7 @@ async function runGlobalLearningCycle(): Promise<{
         // #9 FIX: Renormalize to maintain 100-point total
         const normalizedWeights = normalizeWeights(currentWeights);
         Object.assign(currentWeights, normalizedWeights);
-        await updateGlobalWeights(currentWeights as unknown as Record<string, number>);
+        await updateGlobalWeights(currentWeights);
 
         // Calculate the learning event timestamp: 100ms after the 3rd loss
         const learningEventTime = lossStreak.streakEndTime
@@ -519,7 +519,7 @@ async function runGlobalWinBoostCycle(): Promise<{
         // #9 FIX: Renormalize to maintain 100-point total
         const normalizedWeights = normalizeWeights(currentWeights);
         Object.assign(currentWeights, normalizedWeights);
-        await updateGlobalWeights(currentWeights as unknown as Record<string, number>);
+        await updateGlobalWeights(currentWeights);
 
         const boostEventTime = winStreak.streakEndTime
             ? new Date(new Date(winStreak.streakEndTime).getTime() + 100).toISOString()
@@ -587,7 +587,7 @@ async function checkWeightRecovery(): Promise<WeightAdjustment[]> {
         // #9 FIX: Renormalize to maintain 100-point total
         const normalizedWeights = normalizeWeights(currentWeights);
         Object.assign(currentWeights, normalizedWeights);
-        await updateGlobalWeights(currentWeights as unknown as Record<string, number>);
+        await updateGlobalWeights(currentWeights);
         log.info(`Weight recovery: ${recoveryAdjustments.length} indicators recovered`);
     }
 

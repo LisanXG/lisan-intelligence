@@ -8,6 +8,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/logger';
 import type { DbSignal, ExitReason } from '@/lib/types/database';
+import type { IndicatorWeights } from '@/lib/engine';
 
 // Re-export for convenience
 export type { DbSignal, ExitReason };
@@ -175,7 +176,7 @@ export async function getGlobalWeights(): Promise<Record<string, number> | null>
  * Update GLOBAL weights (after learning cycle)
  * Uses upsert to create the row if it doesn't exist yet.
  */
-export async function updateGlobalWeights(weights: Record<string, number>): Promise<boolean> {
+export async function updateGlobalWeights(weights: IndicatorWeights | Record<string, number>): Promise<boolean> {
     const { error } = await supabaseServer
         .from('global_weights')
         .upsert({
@@ -588,7 +589,7 @@ export async function getMarketSnapshots(coins: string[]): Promise<Map<string, M
         .in('coin', coins.map(c => c.toUpperCase()));
 
     if (error || !data) {
-        console.error('[MarketSnapshots] Failed to fetch:', error?.message);
+        logger.error('[MarketSnapshots] Failed to fetch:', error?.message);
         return result;
     }
 
@@ -631,7 +632,7 @@ export async function upsertMarketSnapshot(
         }, { onConflict: 'coin' });
 
     if (error) {
-        console.error(`[MarketSnapshots] Upsert failed for ${coin}:`, error.message);
+        logger.error(`[MarketSnapshots] Upsert failed for ${coin}:`, error.message);
     }
 }
 
@@ -667,7 +668,7 @@ export async function setCacheValue(key: string, value: unknown): Promise<void> 
         }, { onConflict: 'key' });
 
     if (error) {
-        console.error(`[CacheStore] Upsert failed for ${key}:`, error.message);
+        logger.error(`[CacheStore] Upsert failed for ${key}:`, error.message);
     }
 }
 

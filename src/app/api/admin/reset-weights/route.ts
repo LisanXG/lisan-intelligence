@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Reset global weights to defaults
-        const success = await updateGlobalWeights(DEFAULT_WEIGHTS as unknown as Record<string, number>);
+        const success = await updateGlobalWeights(DEFAULT_WEIGHTS);
 
         if (!success) {
             return NextResponse.json({ error: 'Failed to reset weights' }, { status: 500 });

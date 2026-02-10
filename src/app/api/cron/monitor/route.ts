@@ -18,6 +18,8 @@ import { RSI, MACD } from '@/lib/engine/indicators';
 
 import { fetchCurrentPrices } from '@/lib/engine/prices';
 
+const log = logger.withContext('CronMonitor');
+
 
 /**
  * Fetch recent candles from Binance for momentum check
@@ -182,7 +184,7 @@ async function checkSignalOutcome(
         : ((entry_price - currentPrice) / entry_price) * 100;
 
     if (signalAge < 30 && Math.abs(profitPct) > 5) {
-        console.log(`[Monitor] BLOCKED ${coin}: Suspicious ${profitPct.toFixed(1)}% in ${signalAge.toFixed(0)}m - likely stale entry price`);
+        log.info(`BLOCKED ${coin}: Suspicious ${profitPct.toFixed(1)}% in ${signalAge.toFixed(0)}m - likely stale entry price`);
         return { hit: false }; // Don't close this signal - it has bad data
     }
 
@@ -193,7 +195,7 @@ async function checkSignalOutcome(
         : ((entry_price - take_profit) / entry_price) * 100;
 
     if (tpSpread < 1) {
-        console.log(`[Monitor] BLOCKED ${coin}: TP spread only ${tpSpread.toFixed(2)}% - indicates stale SL/TP calculation`);
+        log.info(`BLOCKED ${coin}: TP spread only ${tpSpread.toFixed(2)}% - indicates stale SL/TP calculation`);
         return { hit: false }; // Don't process - bad TP data
     }
 
@@ -212,7 +214,7 @@ async function checkSignalOutcome(
         // v4.1: Dual-timeframe confirmation (1h + 4h) to avoid premature exits
         if (profitPct >= WIN_THRESHOLD_PCT) {
             const { shouldExit, reason } = await checkDualTimeframeMomentum(coin, 'LONG');
-            console.log(`[Monitor] ${coin} LONG at +${profitPct.toFixed(2)}%: ${reason}`);
+            log.debug(`${coin} LONG at +${profitPct.toFixed(2)}%: ${reason}`);
 
             if (shouldExit) {
                 // Both timeframes confirm momentum fading — take profit
@@ -240,7 +242,7 @@ async function checkSignalOutcome(
         // v4.1: Dual-timeframe confirmation (1h + 4h) to avoid premature exits
         if (profitPct >= WIN_THRESHOLD_PCT) {
             const { shouldExit, reason } = await checkDualTimeframeMomentum(coin, 'SHORT');
-            console.log(`[Monitor] ${coin} SHORT at +${profitPct.toFixed(2)}%: ${reason}`);
+            log.debug(`${coin} SHORT at +${profitPct.toFixed(2)}%: ${reason}`);
 
             if (shouldExit) {
                 // Both timeframes confirm momentum fading — take profit
@@ -268,7 +270,6 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const log = logger.withContext('CronMonitor');
     const startTime = Date.now();
 
     try {

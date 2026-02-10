@@ -34,10 +34,10 @@ import { fetchCurrentPrices } from '@/lib/engine/prices';
 
 const HYPERLIQUID_API = 'https://api.hyperliquid.xyz/info';
 
+const log = logger.withContext('CronGenerate');
+
 // Convert curated assets to format needed for generation
 const COINS_TO_ANALYZE = CURATED_ASSETS;
-
-const BINANCE_ONLY_COINS = ['AVAX', 'ATOM', 'LTC']; // Coins with poor HL coverage
 
 /**
  * Fetch OHLCV data - Binance primary, Hyperliquid fallback
@@ -145,12 +145,17 @@ async function fetchFearGreed(): Promise<number | null> {
         // Fallback: try cached value
         const cached = await getCacheValue<{ value: number; timestamp: number }>('fear_greed_latest');
         if (cached && cached.value) {
-            console.log(`[CronGenerate] F&G API failed, using cached value: ${cached.value}`);
+            log.info(`F&G API failed, using cached value: ${cached.value}`);
             return cached.value;
         }
-        console.error('[CronGenerate] F&G API failed and no cache available');
+        log.error('F&G API failed and no cache available');
         return null;
     }
+}
+
+/** Type bridge: converts IndicatorWeights to Record<string, number> for Supabase JSONB */
+function weightsToRecord(w: IndicatorWeights): Record<string, number> {
+    return Object.fromEntries(Object.entries(w));
 }
 
 
@@ -162,7 +167,6 @@ export async function GET(request: NextRequest) {
     if (!cronSecret || secret !== cronSecret) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    const log = logger.withContext('CronGenerate');
     const startTime = Date.now();
 
     try {
@@ -195,7 +199,7 @@ export async function GET(request: NextRequest) {
         // 3. Get GLOBAL weights (or use defaults)
         const weights = await getGlobalWeights();
         const effectiveWeights = weights
-            ? (weights as unknown as IndicatorWeights)
+            ? Object.assign({} as IndicatorWeights, weights)
             : DEFAULT_WEIGHTS;
 
         // 4. Fetch Fear & Greed once
@@ -225,12 +229,17 @@ export async function GET(request: NextRequest) {
         }
 
         // Compute real altcoin price changes from OHLCV (not premium)
+        // Parallelized for performance — these fetches are independent
+        const altcoins = coinsToGenerate.filter(c => c !== 'BTC');
+        const altOHLVResults = await Promise.allSettled(
+            altcoins.map(c => fetchOHLCV(c))
+        );
         const altcoinChanges: number[] = [];
-        for (const c of coinsToGenerate.filter(c => c !== 'BTC')) {
-            const altOHLCV = await fetchOHLCV(c);
-            if (altOHLCV.length >= 2) {
-                const pctChange = ((altOHLCV[altOHLCV.length - 1].close - altOHLCV[altOHLCV.length - 2].close) /
-                    altOHLCV[altOHLCV.length - 2].close) * 100;
+        for (const result of altOHLVResults) {
+            if (result.status === 'fulfilled' && result.value.length >= 2) {
+                const data = result.value;
+                const pctChange = ((data[data.length - 1].close - data[data.length - 2].close) /
+                    data[data.length - 2].close) * 100;
                 altcoinChanges.push(pctChange);
             }
         }
@@ -363,8 +372,8 @@ export async function GET(request: NextRequest) {
                         ...signal.indicators,
                         regime: regimeAnalysis.regime,
                         regimeConfidence: regimeAnalysis.confidence,
-                    } as unknown as Record<string, number>,
-                    weights_used: effectiveWeights as unknown as Record<string, number>,
+                    },
+                    weights_used: weightsToRecord(effectiveWeights),
                 });
 
                 if (added) {
